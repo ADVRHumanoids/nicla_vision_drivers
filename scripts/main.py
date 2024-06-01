@@ -79,6 +79,7 @@ class StreamManager():
         # CONNECTION TYPE is
         # 1 for TCP, or
         # 0 for UDP
+
         self.CONNECTION_TYPE = connection_type
 
         # wifi ssid and password
@@ -233,9 +234,7 @@ class StreamManager():
         timestamp = time.ticks_ms()
         #print("TIMESTAMP: ", timestamp, "PACKET: ", imu_packet, "LENGTH: ", len(imu_packet))
 
-        print("TIMESTAMP: ", timestamp)
         timestamp = timestamp.to_bytes(self.int2bytes_size, "big")
-
 
         # picture packet too big, skip transmission
         if (picture_size + self.HEADER_LENGTH > self.packet_size):
@@ -243,13 +242,7 @@ class StreamManager():
         else:
 
             pkg_size = self.HEADER_SIZE_DIM + picture_size
-
-            print("SIZE: ", picture_size, "TOT: ", pkg_size)
-
             pkg_size = pkg_size.to_bytes(self.int2bytes_size, "big")
-            print("BYTES SIZE: ", pkg_size)
-
-
 
             try:
                 if self.CONNECTION_TYPE:
@@ -272,7 +265,7 @@ class StreamManager():
             pkg_size = pkg_size.to_bytes(self.int2bytes_size, "big")
             try:
                 if self.CONNECTION_TYPE:
-                    self.client.sendall( pkg_size + timestamp + bytes([self.AUDIO_TYPE]) + audio_buf)
+                    self.client.sendall( pkg_size + timestamp + bytes([self.AUDIO_TYPE]) + self.audio_buf)
                 else:
                     self.client.sendto( pkg_size + timestamp + bytes([self.AUDIO_TYPE]) + self.audio_buf, (self.ip, self.port))
 
