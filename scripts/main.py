@@ -62,10 +62,10 @@ class UDPError(Exception):
 
 
 class StreamManager():
-    def __init__(self, ssid, pwd, ip, connection_type, verbose):
+    def __init__(self, ssid, pwd, ip, connection_type, verbose=False):
 
         # warning settings
-        self.verbose = verbose #False
+        self.verbose = verbose
         self.error_timeout = 5 # seconds to display error warning led
 
         # error handling init
@@ -82,15 +82,16 @@ class StreamManager():
         self.CONNECTION_TYPE = connection_type
 
         # wifi ssid and password
-        self.ssid = ssid #"DamianoHotspot"
-        self.password = pwd #"DamianoHotspot"
+        self.ssid = ssid
+        self.password = pwd
 
         # server address and port
-        self.ip = ip #"10.240.23.49"
+        self.ip = ip
         self.port = 8002
 
         # wifi init
         self.wlan = network.WLAN(network.STA_IF)
+        self.connect()
 
         ## TCP
         if self.CONNECTION_TYPE:
@@ -148,8 +149,8 @@ class StreamManager():
             del self.mic_buf[:10]
 
     def connect(self):
-        if self.verbose == True:
-            print("Connecting to wifi network", self.ssid)
+        #if self.verbose == True:
+        print("Connecting to wifi network", self.ssid)
         self.wlan.active(False)
         time.sleep(2)
         self.wlan.active(True)
@@ -158,8 +159,8 @@ class StreamManager():
             self.error_network.on()
             time.sleep(1)
         self.error_network.off()
-        if self.verbose == True:
-            print(self.wlan.ifconfig())
+        #if self.verbose == True:
+        print(self.wlan.ifconfig())
 
     def connect_TCP(self):
         connected = False
@@ -171,22 +172,14 @@ class StreamManager():
                 self.client.connect((self.ip, self.port))
                 connected = True
             except:
-                if self.verbose:
-                    print("Waiting for TCP connection to be established...")
+                time.sleep(1)
+                #if self.verbose:
+                print("Waiting for TCP connection to be established...")
                 continue
 
     def connect_UDP(self):
-        connected = False
-        while not connected:
-            try:
-                # Create a socket (SOCK_DGRAM means a UDP socket)
-                client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                connected = True
-            except:
-                if self.verbose:
-                    print("Waiting for UDP connection to be initiated...")
-                continue
-
+        print("Waiting for UDP connection to be initiated...")
+        self.client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def sense_and_send(self):
 
@@ -239,6 +232,8 @@ class StreamManager():
 
         timestamp = time.ticks_ms()
         #print("TIMESTAMP: ", timestamp, "PACKET: ", imu_packet, "LENGTH: ", len(imu_packet))
+
+        print("TIMESTAMP: ", timestamp)
         timestamp = timestamp.to_bytes(self.int2bytes_size, "big")
 
 
@@ -246,11 +241,22 @@ class StreamManager():
         if (picture_size + self.HEADER_LENGTH > self.packet_size):
             raise ValueErrorImage
         else:
+
             pkg_size = self.HEADER_SIZE_DIM + picture_size
+
+            print("SIZE: ", picture_size, "TOT: ", pkg_size)
+
             pkg_size = pkg_size.to_bytes(self.int2bytes_size, "big")
+            print("BYTES SIZE: ", pkg_size)
+
+
+
             try:
-                self.client.sendto( pkg_size + timestamp + bytes([self.IMAGE_TYPE]) + picture, (self.ip, self.port))
-                #client.sendall( pkg_size + timestamp + bytes([IMAGE_TYPE]) + picture)
+                if self.CONNECTION_TYPE:
+                    self.client.sendall( pkg_size + timestamp + bytes([self.IMAGE_TYPE]) + picture)
+                else:
+                    self.client.sendto( pkg_size + timestamp + bytes([self.IMAGE_TYPE]) + picture, (self.ip, self.port))
+
             except:
                 if self.CONNECTION_TYPE:
                     raise TCPError
@@ -265,8 +271,11 @@ class StreamManager():
             pkg_size = self.HEADER_SIZE_DIM + len(self.audio_buf)
             pkg_size = pkg_size.to_bytes(self.int2bytes_size, "big")
             try:
-                self.client.sendto( pkg_size + timestamp + bytes([self.AUDIO_TYPE]) + self.audio_buf, (self.ip, self.port))
-                #client.sendall( pkg_size + timestamp + bytes([AUDIO_TYPE]) + audio_buf)
+                if self.CONNECTION_TYPE:
+                    self.client.sendall( pkg_size + timestamp + bytes([self.AUDIO_TYPE]) + audio_buf)
+                else:
+                    self.client.sendto( pkg_size + timestamp + bytes([self.AUDIO_TYPE]) + self.audio_buf, (self.ip, self.port))
+
             except:
                 if self.CONNECTION_TYPE:
                     raise TCPError
@@ -275,8 +284,10 @@ class StreamManager():
                 pass
 
         try:
-            self.client.sendto( self.DISTANCE_SIZE + timestamp + bytes([self.DISTANCE_TYPE]) + distance, (self.ip, self.port))
-            #client.sendall( DISTANCE_SIZE + timestamp + bytes([DISTANCE_TYPE]) + distance)
+            if self.CONNECTION_TYPE:
+                self.client.sendall( self.DISTANCE_SIZE + timestamp + bytes([self.DISTANCE_TYPE]) + distance)
+            else:
+                self.client.sendto( self.DISTANCE_SIZE + timestamp + bytes([self.DISTANCE_TYPE]) + distance, (self.ip, self.port))
         except:
             if self.CONNECTION_TYPE:
                 raise TCPError
@@ -285,8 +296,11 @@ class StreamManager():
             pass
 
         try:
-            self.client.sendto( self.IMU_SIZE + timestamp + bytes([self.IMU_TYPE]) + imu_packet, (self.ip, self.port))
-            #client.sendall( IMU_SIZE + timestamp + bytes([IMU_TYPE]) + imu_packet)
+            if self.CONNECTION_TYPE:
+                self.client.sendall( self.IMU_SIZE + timestamp + bytes([self.IMU_TYPE]) + imu_packet)
+            else:
+                self.client.sendto( self.IMU_SIZE + timestamp + bytes([self.IMU_TYPE]) + imu_packet, (self.ip, self.port))
+
         except:
             if self.CONNECTION_TYPE:
                 raise TCPError
@@ -295,8 +309,8 @@ class StreamManager():
             pass
 
         ## DEBUG PACKET
-        #debug_packet = bytearray([IMAGE_TYPE, AUDIO_TYPE, DISTANCE_TYPE, IMU_TYPE, IMU_TYPE, IMU_TYPE])
-        #client.sendto( IMU_SIZE + timestamp + bytes([IMU_TYPE]) + debug_packet, (ip, port))
+        #debug_packet = bytearray([self.IMAGE_TYPE, self.AUDIO_TYPE, self.DISTANCE_TYPE, self.IMU_TYPE, self.IMU_TYPE, self.IMU_TYPE])
+        #client.sendto( self.IMU_SIZE + timestamp + bytes([self.IMU_TYPE]) + debug_packet, (self.ip, self.port))
 
         if self.verbose == True:
             print("Transmission completed")
@@ -338,7 +352,7 @@ class StreamManager():
                 self.error = True
                 self.error_time = time.time()
                 self.error_network.on()
-                self.connect_UDP()
+                #self.connect_UDP()
                 pass
 
 
@@ -354,10 +368,6 @@ class StreamManager():
 def main():
 
     try:
-#        f = open('./config.json', 'w')
-#        print(dir(f))
-#        print(f.readline(0))
-#        print("AAAAAAAAAAAAAA")
         params = None
         with open('config.json', 'r') as f:
             data = f.read()
@@ -366,18 +376,18 @@ def main():
         if params == None:
             print("No parameters in the config file")
             raise Exception
+
         ssid = params["ssid"]
         pwd = params["password"]
         ip = params["ip"]
         connection_type = params["connection_type"]
         verbose = params["verbose"]
 
+        print("Initiating StreamManager with following parameters\nssid: {}, pwd: {}, ip: {},\nconnection type: {}, verbose: {}".format(ssid, pwd, ip, connection_type, verbose))
+
         manager = StreamManager(ssid, pwd, ip, connection_type, verbose)
 
-        manager.connect()
-
         manager.run()
-
 
     except Exception as e:
         print("Exception caught in main: ", e)
