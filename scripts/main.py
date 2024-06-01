@@ -383,7 +383,7 @@ def main():
         connection_type = params["connection_type"]
         verbose = params["verbose"]
 
-        print("Initiating StreamManager with following parameters\nssid: {}, pwd: {}, ip: {},\nconnection type: {}, verbose: {}".format(ssid, pwd, ip, connection_type, verbose))
+        print("Initiating StreamManager with following parameters:\nssid: {}, pwd: {}, ip: {},\nconnection type: {}, verbose: {}".format(ssid, pwd, ip, connection_type, verbose))
 
         manager = StreamManager(ssid, pwd, ip, connection_type, verbose)
 
