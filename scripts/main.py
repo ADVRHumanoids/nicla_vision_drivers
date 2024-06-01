@@ -373,7 +373,7 @@ def main():
         ssid = params["ssid"]
         pwd = params["password"]
         ip = params["ip"]
-        connection_type = params["connection_type"]
+        connection_type = 1 if params["connection_type"] == "tcp" else 0
         verbose = params["verbose"]
 
         print("Initiating StreamManager with following parameters:\nssid: {}, pwd: {}, ip: {},\nconnection type: {}, verbose: {}".format(ssid, pwd, ip, connection_type, verbose))
