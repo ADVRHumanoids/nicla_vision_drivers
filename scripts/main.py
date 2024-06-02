@@ -186,9 +186,13 @@ class StreamManager():
 
         # Directions and signs set by evidence
         acc_y, acc_x, acc_z = self.lsm.accel()  # Accelerometer
-        acc_z = -acc_z
+        acc_x = -acc_x
+        acc_y = -acc_y
         gyro_y, gyro_x, gyro_z = self.lsm.gyro()# Gyroscope
+        gyro_x = -gyro_x
+        gyro_y = -gyro_y
         gyro_z = -gyro_z
+         
 
         # Converting IMU values to bytes
         imu_packet = struct.pack('>ffffff', acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z)
