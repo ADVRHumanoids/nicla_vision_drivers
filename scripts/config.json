@@ -1,7 +1,7 @@
 { 
-    "ssid": "DamianoHotspot",
-    "password": "DamianoHotspot",
-    "ip": "10.240.23.49",
-    "connection_type": "tcp",
+    "ssid": "YOUR_SSID",
+    "password": "YOUR_SSID_PASS",
+    "ip": "X.X.X.X",
+    "connection_type": "tcp_OR_udp",
     "verbose": false 
 }
