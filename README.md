@@ -1,7 +1,7 @@
 # :star: Nicla Vision Drivers :star:
 Plug-and-play MicroPython drivers for Arduino Nicla Vision sensors.
 
-![Alt Text](assets/Nicla_Vision.jpeg)
+![Alt Text](assets/Nicla_Vision.png)
 
 -------------------
 
@@ -9,20 +9,19 @@ Plug-and-play MicroPython drivers for Arduino Nicla Vision sensors.
 
 This package contains the MicroPython drivers enabling the [Arduino Nicla Vision](https://docs.arduino.cc/hardware/nicla-vision/) board to be ready-to-use in the ROS world! :boom:
 
-The implemented architecture is described in the above image: the Arduino Nicla Vision board streams the sensors data to a ROS-running machine through TCP/UDP socket. This package provides the drivers that will be running on the Nicla Vision board, allowing to:
-- connect the board to a WiFi
-- start a TCP/UDP socket stream
-- sense all the sensors 
-- serialize the sensors data
-- send the sensors data through the socket 
+The developed MicroPython script allows for streaming of sensors data from the Arduino Nicla Vision board to a ROS-running machine via TCP or UDP sockets. 
+This package provide the optimised drivers that will be running on the Nicla Vision board, allowing to:
+- connect the board to a WiFi,
+- start a TCP/UDP socket stream,
+- sense all the sensors,
+- serialize the sensors data,
+- send the sensors data through the socket.
 
 Here a list of the available sensors onboard the Arduino Nicla Vision board:
 - **2MP color camera** 
 - **Time-of-Flight (distance) sensor**  
 - **Microphone**  
 - **Imu**
-
-In this repository you can find the MicroPython code optimised for establishing a connection, sensing and transmitting the sensors data by the board.
 
 ## Table of Contents 
 1. [Installation](#installation)
@@ -37,36 +36,42 @@ In this repository you can find the MicroPython code optimised for establishing 
 # Installation
 Step-by-step instructions on how to get the drivers running onboard the Arduino Nicla Vision:
 
-1. Connect the board to the pc
-2. If it is your first time with the board, please follow the [Getting Started tutorial here](https://docs.arduino.cc/tutorials/nicla-vision/getting-started/), for getting the latest available firmware of the board through OpenMV IDE
-3. `$ git clone https://github.com/ADVRHumanoids/nicla_vision_drivers.git`
-4. `$ cd nicla_vision_drivers`
-5. Copy the `main.py` and `config.json` files in ìnside the memory of the board.
+1. Connect the board to the pc.
+2. If it is your first time with the board, please follow the [Getting Started tutorial here](https://docs.arduino.cc/tutorials/nicla-vision/getting-started/), for getting the latest available firmware of the board through OpenMV IDE.
+3. Download the `scripts/main.py` and `scripts/config.json` files of this repository 
+5. Copy the `main.py` and `config.json` files ìnside the memory of the Nicla Vision board.
 6. Reboot the board (unplug and plug again the board to the pc)
 
 # Usage 
-Follow the following two steps for enjoying your Arduino Nicla Vision board.
+Follow the below two steps for enjoying your Arduino Nicla Vision board! 🚀
 
-1. Turn on an hotspot connection on your pc.
+1. Turn on a Hotspot connection on your pc.
    
    **Note:** if you are on Ubuntu, click on Settings->WiFi->top three dots->"Turn on WiFi Hotspot...". If "Turn on WiFi Hotspot..." is grayed out, click first on the Network tab and then follow       again the procedure starting from the WiFi tab. If the Hotspot is already configured, run this command in a terminal: `$ nmcli connection up Hotspot`
-3. `$ ifconfig` on your pc, copy the ip address under the enp voice (following point)
-4. Set the other parameters in the `config.json` file:
+   
+2. `$ ifconfig` on your pc, and copy the "inet" address under the "enp" voice (following point)
+3. Set the parameters in the `config.json` file:
    - `ssid`: the name of the activated Hotspot
    - `password`: the password of the activated Hotspot
-   - `ip`: ip address copied at point 2.
+   - `ip`: IP address copied at point 2.
    - `connection_type`: "tcp" or "udp" (the user can choose if the board should transmit the sensors data by UDP or TCP socket connection)
    - `verbose`: true or false (for visualizing some debug prints in OpenMV IDE) 
-5. Run the `main.py`:
+4. Run the `main.py`:
    - just turn on the board (e.g. connecting it to the pc)
-   - using OpenMV IDE [Getting Started tutorial here](https://docs.arduino.cc/tutorials/nicla-vision/getting-started/)
+   - using OpenMV IDE ([Getting Started tutorial here](https://docs.arduino.cc/tutorials/nicla-vision/getting-started/))
+  
+   **Note:** Look at the LED of your board! The first seconds (about 15 sec) after having turned it on, the LED should be Blue.
+      - When the board is correctly connected and it is streaming, the LED will turn off.
+      - If you are having connection issues, the LED will be Blue again.
+      - If during execution you see a Green LED, it is for unforseen errors.
+      - If during execution you see a Red LED, it is for memory errors (usually picture quality too high).
 
 :sunny: Now you are ready to go!
 Check out the [Nicla Vision ROS2 repository](https://github.com/ADVRHumanoids/nicla_vision_ros2.git) or the [Nicla Vision ROS repository](https://github.com/ADVRHumanoids/nicla_vision_ros.git) for unlocking the Nicla Vision board in the ROS ecosystem! :sunny:
 
 # Video Demonstration
 
-https://github.com/ADVRHumanoids/nicla_vision_ros/assets/63496571/699b265c-3f6a-4a9d-8d6c-fccf6bd39227
+https://github.com/ADVRHumanoids/nicla_vision_ros2/assets/63496571/247952a0-86cb-4514-a034-d8736c8b70ba
 
 # Package List
 Here some useful links:
