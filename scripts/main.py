@@ -185,10 +185,9 @@ class StreamManager():
     def sense_and_send(self):
 
         # Directions and signs set by evidence
-        acc_y, acc_x, acc_z = self.lsm.accel()  # Accelerometer
-        acc_z = -acc_z
-        gyro_y, gyro_x, gyro_z = self.lsm.gyro()# Gyroscope
-        gyro_z = -gyro_z
+        acc_x, acc_y, acc_z = self.lsm.accel()  # Accelerometer
+        gyro_x, gyro_y, gyro_z = self.lsm.gyro()# Gyroscope
+
 
         # Converting IMU values to bytes
         imu_packet = struct.pack('>ffffff', acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z)
