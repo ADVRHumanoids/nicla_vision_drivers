@@ -137,7 +137,7 @@ class StreamManager():
         CHANNELS = 1
         self.mic_buf = []
         self.audio_buf = None
-        audio.init(channels=CHANNELS, frequency=16000, gain_db=24, highpass=0.9883)
+        audio.init(channels=CHANNELS, frequency=16000, gain_db=256, highpass=0.1883)
         audio.start_streaming(self.audio_callback) # Start audio streaming
 
         # IMU
