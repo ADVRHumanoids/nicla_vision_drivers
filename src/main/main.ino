@@ -12,11 +12,12 @@
 
 // Create StreamManager object
 #define IP 10, 42, 0, 1
-#define NETWORK_SSID "hhcm-pilot"
-#define NETWORK_KEY "hhcm-pilot"
+#define NETWORK_SSID "DamianoHotspot"
+#define NETWORK_KEY "DamianoHotspot"
 #define NETWORK_TYPE "tcp" //only tcp for now
-#define VERBOSE false
-#define VERBOSE_TIME false
+#define SERIAL_ENABLE false
+#define VERBOSE SERIAL_ENABLE && false
+#define VERBOSE_TIME SERIAL_ENABLE && false
 
 
 // // Microphone
@@ -230,21 +231,21 @@ void StreamManager::connectWifi(){
 
   // check for the presence of the shield:
   if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi shield not present");
+    if(SERIAL_ENABLE) Serial.println("WiFi shield not present");
     // don't continue:
     while (true);
   }
 
   // attempt to connect to Wifi network:
   while (status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
+    if(SERIAL_ENABLE) Serial.print("Attempting to connect to SSID: ");
+    if(SERIAL_ENABLE) Serial.println(ssid);
     // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
     status = WiFi.begin(ssid, password);
     delay(3000); // wait 3 seconds for connection:
   }
 
-  Serial.println("Connected to wifi");
+  if(SERIAL_ENABLE) Serial.println("Connected to wifi");
   this->printWifiStatus();
 
   this->switchOffLED("blue");
@@ -252,19 +253,19 @@ void StreamManager::connectWifi(){
 
 void StreamManager::printWifiStatus() {
   // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
+  if(SERIAL_ENABLE) Serial.print("SSID: ");
+  if(SERIAL_ENABLE) Serial.println(WiFi.SSID());
 
   // print your WiFi shield's IP address:
   IPAddress ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
+  if(SERIAL_ENABLE) Serial.print("IP Address: ");
+  if(SERIAL_ENABLE) Serial.println(ip);
 
   // print the received signal strength:
   long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
+  if(SERIAL_ENABLE) Serial.print("signal strength (RSSI):");
+  if(SERIAL_ENABLE) Serial.print(rssi);
+  if(SERIAL_ENABLE) Serial.println(" dBm");
 }
 
 void StreamManager::startClientSocket() {
@@ -274,21 +275,21 @@ void StreamManager::startClientSocket() {
   //     while (millis() - startAttemptTime < attemptDuration)
   this->switchOnLED("blue");
   if (connection_type){
-    Serial.println("\nStarting socket connection to server...");
+    if(SERIAL_ENABLE) Serial.println("\nStarting socket connection to server...");
 
     client.connect(ip, port);
     while (!client.connected()) {
       client.stop();
       client.connect(ip, port);
-      Serial.println("Not connected, retrying...");
+      if(SERIAL_ENABLE) Serial.println("Not connected, retrying...");
       delay(1000); // wait 3 seconds for connection:
     }
 
-    Serial.println("\nSocket connection to server established!");
+    if(SERIAL_ENABLE) Serial.println("\nSocket connection to server established!");
   }
   else{
 
-    Serial.println("Please implement UDP!");
+    if(SERIAL_ENABLE) Serial.println("Please implement UDP!");
     this->switchOnLED("red");
   }
 
@@ -337,18 +338,18 @@ void StreamManager::staticCallback() {
 
 void StreamManager::initSensors() {
 
-  Serial.println("\nInitiating sensors...!\n");
+  if(SERIAL_ENABLE) Serial.println("\nInitiating sensors...!\n");
 
   // Camera  
   camPtr = std::make_shared<Camera>(nicla_cam);
    
   // Init the cam QVGA, 30FPS 
   if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, sample_rate)) {
-    Serial.println("\nCamera not available!\n");
+    if(SERIAL_ENABLE) Serial.println("\nCamera not available!\n");
     this->switchOnLED("red");
   }
 
-  Serial.println("\nCamera DONE...!\n");
+  if(SERIAL_ENABLE) Serial.println("\nCamera DONE...!\n");
  
   
 
@@ -358,7 +359,7 @@ void StreamManager::initSensors() {
   proximity.setBus(&Wire1);
 
   if (!proximity.init()) {
-    Serial.println("\nFailed to detect and initialize sensor!");
+    if(SERIAL_ENABLE) Serial.println("\nFailed to detect and initialize sensor!");
     this->switchOnLED("red");
   }
 
@@ -366,7 +367,7 @@ void StreamManager::initSensors() {
   proximity.setMeasurementTimingBudget(10000);
   proximity.startContinuous(10);
 
-  Serial.println("\nToF DONE...!\n");
+  if(SERIAL_ENABLE) Serial.println("\nToF DONE...!\n");
 
 
 
@@ -383,14 +384,14 @@ void StreamManager::initSensors() {
   // - a 16 kHz sample rate for the Arduino Nano 33 BLE Sense
   // - a 32 kHz or 64 kHz sample rate for the Arduino Portenta Vision Shield
   if (!PDM.begin(channels, frequency)) {
-    Serial.println("\nFailed to start PDM!");
+    if(SERIAL_ENABLE) Serial.println("\nFailed to start PDM!");
     this->switchOnLED("red");
   }
 
-  Serial.println("\nMic DONE...!\n");
+  if(SERIAL_ENABLE) Serial.println("\nMic DONE...!\n");
 
 
-  Serial.println("Init Sensors DONE !\n");
+  if(SERIAL_ENABLE) Serial.println("Init Sensors DONE !\n");
 }
 
 // Function to convert a pair of bytes to a 16-bit unsigned integer
@@ -454,7 +455,7 @@ void StreamManager::sense_and_send() {
   // Microphone
   // Wait for samples to be read 
   if (audio_buffer_filled) {
-    Serial.print("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO");
+    if(SERIAL_ENABLE) Serial.print("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO");
     audio_buffer_filled = false;
   }
   if (audio_buffer_i > 0) {
@@ -504,7 +505,7 @@ void StreamManager::sense_and_send() {
   }
 
   // Camera  
-  if (camPtr->grabFrame(fb, 3000) == 0) {  
+  if (camPtr->grabFrame(fb, 500) == 0) {  
 
     if (VERBOSE_TIME) start_time = micros();
     uint8_t* out_jpg = fb.getBuffer();
@@ -567,8 +568,8 @@ void StreamManager::sense_and_send() {
       // client.write(out_jpg, out_jpg_len+sizeof(out_jpg_len));
 
       if (!client.connected()) { 
-        Serial.println();
-        Serial.println("Server disconnected!");
+        if(SERIAL_ENABLE) Serial.println();
+        if(SERIAL_ENABLE) Serial.println("Server disconnected!");
         client.stop();
         this->switchOnLED("blue");
         return;
@@ -629,10 +630,12 @@ void setup() {
   // put your setup code here, to run once:
 
   // Initialize serial and wait for port to open:
-  Serial.begin(500000); //9600 921600
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for native USB port only
+  if(SERIAL_ENABLE) {
+    Serial.begin(500000); //9600 921600
+    while (!Serial) {
+      ; // wait for serial port to connect. Needed for native USB port only
   } 
+  }
  
   // DEBUG SIZE 
   // Serial.print("SIZE OF INT: ");
