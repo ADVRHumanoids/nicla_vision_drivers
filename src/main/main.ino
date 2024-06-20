@@ -11,11 +11,12 @@
 #define IMAGE_MODE CAMERA_RGB565
 
 // Create StreamManager object
-#define IP 10, 240, 23, 49
-#define NETWORK_SSID "DamianoHotspot"
-#define NETWORK_KEY "DamianoHotspot"
+#define IP 10, 42, 0, 1
+#define NETWORK_SSID "hhcm-pilot"
+#define NETWORK_KEY "hhcm-pilot"
 #define NETWORK_TYPE "tcp" //only tcp for now
-#define VERBOSE 1
+#define VERBOSE false
+#define VERBOSE_TIME false
 
 
 // // Microphone
@@ -95,7 +96,7 @@ class StreamManager {
 
     // # Defining package dimensions (bytes) utils
     const unsigned int int2bytesSize = 4; 
-    const unsigned int sample_buff_size = sizeof(sampleBuffer); 
+    const unsigned int sample_buff_size = sizeof(sampleBuffer[0]); 
     const unsigned int packetSize = 65000;
     const unsigned int headerLength = int2bytesSize + int2bytesSize + sizeof(IMAGE_TYPE);  // bytes (pkg size + timestamp size + data type size) = 4 + 4 + 1 =  9
     const unsigned int imuSize_ = headerLength - int2bytesSize + 6 * int2bytesSize;        // 6 Floats and each Float is 4 bytes (as the Int);
@@ -121,12 +122,19 @@ class StreamManager {
     // Microphone
     static const char channels = 1; // default number of output channels
     static const int frequency = 16000; // default PCM output frequency  
-    short sampleBuffer[512]; // Buffer to read samples into, each sample is 16-bits
+    static const short audio_buffer_size = 10; 
+    volatile bool audio_buffer_filled = false;
+    short sampleBuffer[10][512]; // Buffers to read samples into, each sample is 16-bits
+    unsigned short audio_buffer_i = 0; // index for audio buffers
     volatile int samplesRead; // Number of audio samples read
 
     // ToF
     VL53L1X proximity;
     int reading = 0;
+
+    //Debug - Verbose stuff
+    unsigned long start_time;
+    unsigned long end_time;
   
 };
 
@@ -287,6 +295,7 @@ void StreamManager::startClientSocket() {
   this->switchOffLED("blue");
 }
 
+
 /**
  * Callback function to process the data from the PDM microphone.
  * NOTE: This callback is executed as part of an ISR.
@@ -297,10 +306,19 @@ void StreamManager::onPDMdata() {
   int bytesAvailable = PDM.available(); 
 
   // Read into the sample buffer
-  PDM.read(sampleBuffer, bytesAvailable);
+  PDM.read(sampleBuffer[audio_buffer_i], bytesAvailable);
 
   // 16-bit, 2 bytes per sample
-  samplesRead = bytesAvailable / 2; 
+  samplesRead = bytesAvailable / 2; //TODO is this still necessary?
+
+  //TODO handle circular queue better, this assume it will never be filled
+  if (audio_buffer_i < audio_buffer_size-1) {
+    audio_buffer_i++;
+  } else {
+    audio_buffer_filled = true;
+    audio_buffer_i = 0;
+  }
+
 
 }
 
@@ -382,20 +400,30 @@ uint16_t StreamManager::bytes_to_uint16(byte byte1, byte byte2) {
 
 void StreamManager::sense_and_send() {
 
-  if (VERBOSE) Serial.println("Sense and Send !");
+  if (VERBOSE_TIME) Serial.println("START LOOP");
 
-  timestamp = millis();
-
-  if (VERBOSE) Serial.print("Timestamp: "); 
-  if (VERBOSE) Serial.println(timestamp);
+  if (VERBOSE) {
+      Serial.println("Sense and Send !");
+      timestamp = millis();
+      Serial.print("Timestamp: "); 
+      Serial.println(timestamp);
+  }
 
   // ToF
+  if (VERBOSE_TIME) start_time = micros();
   reading = proximity.read();
+  if (VERBOSE_TIME) {
+    end_time = micros();
+    Serial.print("TOF TIME GET (us)"); Serial.println(end_time-start_time);
+  }
+
   if (VERBOSE) Serial.println(reading);
 
   if (!client.connected()) { 
-    if (VERBOSE) Serial.println();
-    if (VERBOSE) Serial.println("Server disconnected!");
+    if (VERBOSE) {
+      Serial.println();
+      Serial.println("Server disconnected!");
+    }
     client.stop();
     this->switchOnLED("blue");
     return;
@@ -403,20 +431,33 @@ void StreamManager::sense_and_send() {
   else {       
     if (VERBOSE) Serial.println("Preparing distance packet ... ");
 
+    if (VERBOSE_TIME) start_time = micros();
     memcpy(im, &distanceSize, int2bytesSize );                                  // sizeof(distanceSize) = int2bytesSize
     memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
     memcpy(im+int2bytesSize*2, &DISTANCE_TYPE, sizeof(DISTANCE_TYPE) );         // sizeof(DISTANCE_TYPE) = 1
     memcpy(im+int2bytesSize*2+sizeof(DISTANCE_TYPE), &reading, int2bytesSize ); // sizeof(reading) = int2bytesSize
+    if (VERBOSE_TIME) {
+      end_time = micros();
+      Serial.print("TOF TIME MEM (us)"); Serial.println(end_time-start_time);
+    }
 
+    if (VERBOSE_TIME) start_time = micros();
     client.write((uint8_t*)im, headerLength+int2bytesSize); 
-
-   if (VERBOSE) Serial.println("Sent distance packet ! ");
+    if (VERBOSE_TIME) {
+      end_time = micros();
+      Serial.print("TOF TIME SEND (us)"); Serial.println(end_time-start_time);
+    }
+    if (VERBOSE) Serial.println("Sent distance packet ! ");
      
   }
  
   // Microphone
   // Wait for samples to be read 
-  if (samplesRead) {
+  if (audio_buffer_filled) {
+    Serial.print("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO");
+    audio_buffer_filled = false;
+  }
+  if (audio_buffer_i > 0) {
 
     // DEBUG: Print samples to the serial monitor or plotter
     // for (int i = 0; i < samplesRead; i++) {
@@ -432,16 +473,29 @@ void StreamManager::sense_and_send() {
     }
     else {      
 
-      Serial.println("Preparing audio packet ... ");
+      //TODO, can we send more mic packed all at once instead of doing this?
+      for (unsigned short i = 0; i < audio_buffer_i; i++) {
 
-      memcpy(im, &audioSize, int2bytesSize );                                                     // sizeof(audioSize) = int2bytesSize
-      memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                                       // sizeof(timestamp) = int2bytesSize
-      memcpy(im+int2bytesSize*2, &AUDIO_TYPE, sizeof(AUDIO_TYPE) );                               // sizeof(AUDIO_TYPE) = 1
-      memcpy(im+int2bytesSize*2+sizeof(AUDIO_TYPE), (uint8_t*)sampleBuffer, sample_buff_size );   // Note: int2bytesSize*2+sizeof(AUDIO_TYPE) = headerLength
+        if (VERBOSE) Serial.println("Preparing audio packet ... ");
 
-      client.write((uint8_t*)im, headerLength+sample_buff_size); 
-
-      if (VERBOSE) Serial.println("Sent audio packet ! ");
+        if (VERBOSE_TIME) start_time = micros();
+        memcpy(im, &audioSize, int2bytesSize );                                                     // sizeof(audioSize) = int2bytesSize
+        memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                                       // sizeof(timestamp) = int2bytesSize
+        memcpy(im+int2bytesSize*2, &AUDIO_TYPE, sizeof(AUDIO_TYPE) );                               // sizeof(AUDIO_TYPE) = 1
+        memcpy(im+int2bytesSize*2+sizeof(AUDIO_TYPE), (uint8_t*)sampleBuffer[i], sample_buff_size );   // Note: int2bytesSize*2+sizeof(AUDIO_TYPE) = headerLength
+        if (VERBOSE_TIME) {
+          end_time = micros();
+          Serial.print("MIC TIME MEM (us)"); Serial.println(end_time-start_time);
+          start_time = micros();
+        }
+        client.write((uint8_t*)im, headerLength+sample_buff_size); 
+        if (VERBOSE_TIME) {
+          end_time = micros();
+          Serial.print("MIC TIME SEND (us)"); Serial.println(end_time-start_time);
+        }
+        if (VERBOSE) Serial.println("Sent audio packet ! ");
+      }
+      audio_buffer_i = 0;
  
     }
 
@@ -452,12 +506,18 @@ void StreamManager::sense_and_send() {
   // Camera  
   if (camPtr->grabFrame(fb, 3000) == 0) {  
 
+    if (VERBOSE_TIME) start_time = micros();
     uint8_t* out_jpg = fb.getBuffer();
+    if (VERBOSE_TIME) {
+      end_time = micros();
+      Serial.print("IMG TIME GET (us)"); Serial.println(end_time-start_time);
+    }
 
     for (int i = 0; i < 2; i++){       // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
       
       // 1. Convert half image from RGB565 to RGB888
       if (VERBOSE) Serial.println("Converting!!!"); 
+      if (VERBOSE_TIME) start_time = micros();
       int idx = 0;
       int start = 0;
       if (i){
@@ -475,16 +535,28 @@ void StreamManager::sense_and_send() {
 
         idx += 3;
       }
+      if (VERBOSE_TIME) {
+        end_time = micros();
+        Serial.print("IMG TIME CONVERT (us)"); Serial.println(end_time-start_time);
+      }
 
       // 2. Compress the half RGB888 image
        
       if (VERBOSE) Serial.println("Encoding started...");        
+      if (VERBOSE_TIME) start_time = micros();
       jpgenc.open(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)); 
       jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_420, JPEGE_Q_LOW); 
       jpgenc.addFrame(&enc, im, 320 * 3); 
       out_jpg_len = jpgenc.close();
-      if (VERBOSE) Serial.println("Encoding closed!");
-      if (VERBOSE) Serial.print("JPEG dimension (byte): "); Serial.println(out_jpg_len);
+      if (VERBOSE_TIME) {
+        end_time = micros();
+        Serial.print("IMG TIME COMPRESS (us)"); Serial.println(end_time-start_time);
+      }
+      if (VERBOSE) {
+         Serial.println("Encoding closed!");
+         Serial.print("JPEG dimension (byte): "); 
+        Serial.println(out_jpg_len);
+      }
         
       // DEBUG:
       // memcpy(out_jpg, &out_jpg_len, int2bytesSize); // Copy the bytes of the dimension number into the array's head
@@ -495,8 +567,8 @@ void StreamManager::sense_and_send() {
       // client.write(out_jpg, out_jpg_len+sizeof(out_jpg_len));
 
       if (!client.connected()) { 
-        if (VERBOSE) Serial.println();
-        if (VERBOSE) Serial.println("Server disconnected!");
+        Serial.println();
+        Serial.println("Server disconnected!");
         client.stop();
         this->switchOnLED("blue");
         return;
@@ -504,18 +576,33 @@ void StreamManager::sense_and_send() {
       else {
 
         if (VERBOSE) Serial.println("Preparing image packet ... ");
+        if (VERBOSE_TIME) start_time = micros();
         imageSize = headerLength - int2bytesSize + out_jpg_len; 
 
         memcpy(out_jpg, &imageSize, int2bytesSize );                        // sizeof(imageSize) = int2bytesSize
         memcpy(out_jpg+int2bytesSize, &timestamp, int2bytesSize );          // sizeof(timestamp) = int2bytesSize
         memcpy(out_jpg+int2bytesSize*2, &IMAGE_TYPE, sizeof(IMAGE_TYPE) );  // sizeof(IMAGE_TYPE) = 1
-        
+        if (VERBOSE_TIME) {
+          end_time = micros();
+          Serial.print("IMG TIME MEM (us)"); Serial.println(end_time-start_time);
+          start_time = micros();
+        }
+
         client.write(out_jpg, headerLength+out_jpg_len); 
+        if (VERBOSE_TIME) {
+          end_time = micros();
+          Serial.print("IMG TIME SEND (us)"); Serial.println(end_time-start_time);
+        }
 
         if (VERBOSE) Serial.println("Sent image packet ! ");
       }
     }   // end camera proc loop
   }  // end camera if
+
+    if (VERBOSE_TIME) {
+      Serial.println("END LOOP");
+      Serial.println("");
+    }
 
 }
 
