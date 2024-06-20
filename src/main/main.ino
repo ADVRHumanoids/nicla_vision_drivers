@@ -10,6 +10,13 @@
  
 #define IMAGE_MODE CAMERA_RGB565
 
+// Create StreamManager object
+#define IP 10, 240, 23, 49
+#define NETWORK_SSID "DamianoHotspot"
+#define NETWORK_KEY "DamianoHotspot"
+#define NETWORK_TYPE "tcp" //only tcp for now
+#define VERBOSE 1
+
 
 // // Microphone
 // static const char channels = 1; // default number of output channels
@@ -299,8 +306,8 @@ void StreamManager::onPDMdata() {
 
 /**************************************************************************************/
 // Create StreamManager object
-IPAddress remoteIP(10, 240, 23, 49);     
-StreamManager stream_manager("DamianoHotspot", "DamianoHotspot", remoteIP, "tcp");
+IPAddress remoteIP(IP);     
+StreamManager stream_manager(NETWORK_SSID, NETWORK_KEY, remoteIP, NETWORK_TYPE);
 /**************************************************************************************/
 
 // Static member function as a trampoline for the callback 
@@ -375,25 +382,26 @@ uint16_t StreamManager::bytes_to_uint16(byte byte1, byte byte2) {
 
 void StreamManager::sense_and_send() {
 
-  Serial.println("Sense and Send !");
+  if (VERBOSE) Serial.println("Sense and Send !");
 
   timestamp = millis();
 
-  Serial.print("Timestamp: "); Serial.println(timestamp);
+  if (VERBOSE) Serial.print("Timestamp: "); 
+  if (VERBOSE) Serial.println(timestamp);
 
   // ToF
   reading = proximity.read();
-  Serial.println(reading);
+  if (VERBOSE) Serial.println(reading);
 
   if (!client.connected()) { 
-    Serial.println();
-    Serial.println("Server disconnected!");
+    if (VERBOSE) Serial.println();
+    if (VERBOSE) Serial.println("Server disconnected!");
     client.stop();
     this->switchOnLED("blue");
     return;
   }
   else {       
-    Serial.println("Preparing distance packet ... ");
+    if (VERBOSE) Serial.println("Preparing distance packet ... ");
 
     memcpy(im, &distanceSize, int2bytesSize );                                  // sizeof(distanceSize) = int2bytesSize
     memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
@@ -402,7 +410,7 @@ void StreamManager::sense_and_send() {
 
     client.write((uint8_t*)im, headerLength+int2bytesSize); 
 
-    Serial.println("Sent distance packet ! ");
+   if (VERBOSE) Serial.println("Sent distance packet ! ");
      
   }
  
@@ -416,8 +424,8 @@ void StreamManager::sense_and_send() {
     // }
 
     if (!client.connected()) { 
-      Serial.println();
-      Serial.println("Server disconnected!");
+      if (VERBOSE) Serial.println();
+      if (VERBOSE) Serial.println("Server disconnected!");
       client.stop();
       this->switchOnLED("blue");
       return;
@@ -433,7 +441,7 @@ void StreamManager::sense_and_send() {
 
       client.write((uint8_t*)im, headerLength+sample_buff_size); 
 
-      Serial.println("Sent audio packet ! ");
+      if (VERBOSE) Serial.println("Sent audio packet ! ");
  
     }
 
@@ -449,7 +457,7 @@ void StreamManager::sense_and_send() {
     for (int i = 0; i < 2; i++){       // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
       
       // 1. Convert half image from RGB565 to RGB888
-      Serial.println("Converting!!!"); 
+      if (VERBOSE) Serial.println("Converting!!!"); 
       int idx = 0;
       int start = 0;
       if (i){
@@ -470,13 +478,13 @@ void StreamManager::sense_and_send() {
 
       // 2. Compress the half RGB888 image
        
-      Serial.println("Encoding started...");        
+      if (VERBOSE) Serial.println("Encoding started...");        
       jpgenc.open(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)); 
       jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_420, JPEGE_Q_LOW); 
       jpgenc.addFrame(&enc, im, 320 * 3); 
       out_jpg_len = jpgenc.close();
-      Serial.println("Encoding closed!");
-      Serial.print("JPEG dimension (byte): "); Serial.println(out_jpg_len);
+      if (VERBOSE) Serial.println("Encoding closed!");
+      if (VERBOSE) Serial.print("JPEG dimension (byte): "); Serial.println(out_jpg_len);
         
       // DEBUG:
       // memcpy(out_jpg, &out_jpg_len, int2bytesSize); // Copy the bytes of the dimension number into the array's head
@@ -487,15 +495,15 @@ void StreamManager::sense_and_send() {
       // client.write(out_jpg, out_jpg_len+sizeof(out_jpg_len));
 
       if (!client.connected()) { 
-        Serial.println();
-        Serial.println("Server disconnected!");
+        if (VERBOSE) Serial.println();
+        if (VERBOSE) Serial.println("Server disconnected!");
         client.stop();
         this->switchOnLED("blue");
         return;
       }
       else {
 
-        Serial.println("Preparing image packet ... ");
+        if (VERBOSE) Serial.println("Preparing image packet ... ");
         imageSize = headerLength - int2bytesSize + out_jpg_len; 
 
         memcpy(out_jpg, &imageSize, int2bytesSize );                        // sizeof(imageSize) = int2bytesSize
@@ -504,7 +512,7 @@ void StreamManager::sense_and_send() {
         
         client.write(out_jpg, headerLength+out_jpg_len); 
 
-        Serial.println("Sent image packet ! ");
+        if (VERBOSE) Serial.println("Sent image packet ! ");
       }
     }   // end camera proc loop
   }  // end camera if
@@ -520,8 +528,8 @@ void StreamManager::run() {
 
   if (!client.connected()) { 
     this->switchOnLED("blue");
-    Serial.println();
-    Serial.println("Server disconnected! Trying to establish new connection...");
+    if (VERBOSE) Serial.println();
+    if (VERBOSE)  Serial.println("Server disconnected! Trying to establish new connection...");
     client.stop();
     this->startClientSocket();    
   }
