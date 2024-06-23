@@ -1,24 +1,33 @@
+#include "config.h"
+
+#define SERIAL_ENABLE ENABLE_ARDUINO_IDE_SERIAL_MONITOR
+#define VERBOSE SERIAL_ENABLE && ENABLE_VERBOSE
+#define VERBOSE_TIME SERIAL_ENABLE && false  //internal debug for operation's time 
+
+#if defined(NETWORK_TYPE) && NETWORK_TYPE == _UDP_
+#include "MyWifiUdp.h"
 #include <SPI.h>
-#include <WiFi.h> 
+#include <WiFi.h>
+#include <Arduino.h> 
+#define NETWORK_TYPE_STR "udp"
+#else
+#include <SPI.h>
+#include <WiFi.h>
+#include <Arduino.h> 
+#include "MyWifiUdp.h"
+#define NETWORK_TYPE_STR "tcp"
+#endif
+
+
 #include "gc2145.h" 
 #include <PDM.h>
-#include <Arduino.h>
 #include <memory>
 #include <functional>
 #include <JPEGENC.h>
 #include "VL53L1X.h"
+
  
 #define IMAGE_MODE CAMERA_RGB565
-
-// Create StreamManager object
-#define IP 10, 42, 0, 1
-#define NETWORK_SSID "DamianoHotspot"
-#define NETWORK_KEY "DamianoHotspot"
-#define NETWORK_TYPE "tcp" //only tcp for now
-#define SERIAL_ENABLE false
-#define VERBOSE SERIAL_ENABLE && false
-#define VERBOSE_TIME SERIAL_ENABLE && false
-
 
 // // Microphone
 // static const char channels = 1; // default number of output channels
@@ -51,6 +60,7 @@ class StreamManager {
     void connectWifi();
     void printWifiStatus();
     void startClientSocket();
+    uint8_t testTCP();
     void initSensors();
     void onPDMdata();
     static void staticCallback(); 
@@ -82,12 +92,17 @@ class StreamManager {
     // # server address and port
     IPAddress ip;
     unsigned int port = 8002; // remote port
+    unsigned int localPort = 9001;
 
     // WiFi connection status
     int status = WL_IDLE_STATUS;
 
     // TCP Client
     WiFiClient client;
+    WiFiClient test_connection_client;
+    unsigned long start_attempt_test;
+    // UDP Client 
+    MyWifiUDP Udp;
 
     // # Define data types for headers (1 byte)
     const uint8_t IMAGE_TYPE = 0;     //0b00;
@@ -275,12 +290,21 @@ void StreamManager::startClientSocket() {
   //     while (millis() - startAttemptTime < attemptDuration)
   this->switchOnLED("blue");
   if (connection_type){
-    if(SERIAL_ENABLE) Serial.println("\nStarting socket connection to server...");
+    if(SERIAL_ENABLE) Serial.println("\nStarting TCP socket connection to server...");
 
-    client.connect(ip, port);
-    while (!client.connected()) {
+    start_time = micros();
+    
+    client.connect(ip, port); 
+
+    end_time = micros();
+    Serial.print("CONNECT TIME (us)"); Serial.println(end_time-start_time);
+
+    while (!client.connected()) { 
       client.stop();
+      start_time = micros();
       client.connect(ip, port);
+      end_time = micros();
+      Serial.print("CONNECT TIME (us)"); Serial.println(end_time-start_time);
       if(SERIAL_ENABLE) Serial.println("Not connected, retrying...");
       delay(1000); // wait 3 seconds for connection:
     }
@@ -288,12 +312,34 @@ void StreamManager::startClientSocket() {
     if(SERIAL_ENABLE) Serial.println("\nSocket connection to server established!");
   }
   else{
-
-    if(SERIAL_ENABLE) Serial.println("Please implement UDP!");
-    this->switchOnLED("red");
+    if(SERIAL_ENABLE) Serial.println("\nStarting UDP socket connection to server...");
+    Udp.begin(localPort);
   }
 
+  start_attempt_test = millis();
   this->switchOffLED("blue");
+}
+
+uint8_t StreamManager::testTCP() {
+  //     unsigned long startAttemptTime = millis();
+  //     const unsigned long attemptDuration = 100000; // 10 seconds overall attempt duration
+  //     const unsigned long retryInterval = 3000; // 3 seconds between retries
+  //     while (millis() - startAttemptTime < attemptDuration)
+   
+  if(SERIAL_ENABLE) Serial.println("\nStarting test on TCP socket connection to server...");
+
+  test_connection_client.connect(ip, port); 
+
+  if (!test_connection_client.connected()) { 
+    this->switchOnLED("blue");     
+    if(SERIAL_ENABLE) Serial.println("Test not connected!"); 
+    test_connection_client.stop();
+    return 0; 
+  }
+  else{
+    test_connection_client.stop();
+    return 1; 
+  }
 }
 
 
@@ -325,8 +371,8 @@ void StreamManager::onPDMdata() {
 
 /**************************************************************************************/
 // Create StreamManager object
-IPAddress remoteIP(IP);     
-StreamManager stream_manager(NETWORK_SSID, NETWORK_KEY, remoteIP, NETWORK_TYPE);
+IPAddress remoteIP(_IP_);     
+StreamManager stream_manager(NETWORK_SSID, NETWORK_KEY, remoteIP, NETWORK_TYPE_STR);
 /**************************************************************************************/
 
 // Static member function as a trampoline for the callback 
@@ -394,63 +440,76 @@ void StreamManager::initSensors() {
   if(SERIAL_ENABLE) Serial.println("Init Sensors DONE !\n");
 }
 
+
 // Function to convert a pair of bytes to a 16-bit unsigned integer
 uint16_t StreamManager::bytes_to_uint16(byte byte1, byte byte2) {
   return (byte1 << 8) | byte2;
 }
 
+
 void StreamManager::sense_and_send() {
 
-  if (VERBOSE_TIME) Serial.println("START LOOP");
+  timestamp = millis();
 
   if (VERBOSE) {
       Serial.println("Sense and Send !");
-      timestamp = millis();
       Serial.print("Timestamp: "); 
       Serial.println(timestamp);
   }
 
   // ToF
-  if (VERBOSE_TIME) start_time = micros();
+  if (VERBOSE_TIME){
+    Serial.println("START LOOP");
+    start_time = micros();
+  } 
+
   reading = proximity.read();
+
   if (VERBOSE_TIME) {
     end_time = micros();
     Serial.print("TOF TIME GET (us)"); Serial.println(end_time-start_time);
   }
+  if (VERBOSE){
+    Serial.print("TOF reading (mm): ");
+    Serial.println(reading);
 
-  if (VERBOSE) Serial.println(reading);
+    Serial.println("Preparing distance packet ... ");
+  } 
 
-  if (!client.connected()) { 
-    if (VERBOSE) {
-      Serial.println();
-      Serial.println("Server disconnected!");
-    }
-    client.stop();
-    this->switchOnLED("blue");
-    return;
+  
+  if (VERBOSE_TIME) start_time = micros();
+
+  memcpy(im, &distanceSize, int2bytesSize );                                  // sizeof(distanceSize) = int2bytesSize
+  memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
+  memcpy(im+int2bytesSize*2, &DISTANCE_TYPE, sizeof(DISTANCE_TYPE) );         // sizeof(DISTANCE_TYPE) = 1
+  memcpy(im+int2bytesSize*2+sizeof(DISTANCE_TYPE), &reading, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  
+  if (VERBOSE_TIME) {
+    end_time = micros();
+    Serial.print("TOF TIME MEM (us)"); Serial.println(end_time-start_time);
+
+    start_time = micros();
   }
-  else {       
-    if (VERBOSE) Serial.println("Preparing distance packet ... ");
 
-    if (VERBOSE_TIME) start_time = micros();
-    memcpy(im, &distanceSize, int2bytesSize );                                  // sizeof(distanceSize) = int2bytesSize
-    memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
-    memcpy(im+int2bytesSize*2, &DISTANCE_TYPE, sizeof(DISTANCE_TYPE) );         // sizeof(DISTANCE_TYPE) = 1
-    memcpy(im+int2bytesSize*2+sizeof(DISTANCE_TYPE), &reading, int2bytesSize ); // sizeof(reading) = int2bytesSize
-    if (VERBOSE_TIME) {
-      end_time = micros();
-      Serial.print("TOF TIME MEM (us)"); Serial.println(end_time-start_time);
-    }
+  if (connection_type){
+    client.write((uint8_t*)im, headerLength+int2bytesSize);
+  }
+  else{
+    Udp.beginPacket(ip, port); 
+    Udp.write((uint8_t*)im, headerLength+int2bytesSize);
+    Udp.endPacket();
+  }
+    
 
-    if (VERBOSE_TIME) start_time = micros();
-    client.write((uint8_t*)im, headerLength+int2bytesSize); 
-    if (VERBOSE_TIME) {
-      end_time = micros();
-      Serial.print("TOF TIME SEND (us)"); Serial.println(end_time-start_time);
-    }
-    if (VERBOSE) Serial.println("Sent distance packet ! ");
+  if (VERBOSE_TIME) {
+    end_time = micros();
+    Serial.print("TOF TIME SEND (us)"); Serial.println(end_time-start_time);
+  }
+
+  if (VERBOSE) Serial.println("Sent distance packet ! ");
      
-  }
+  /***************************************/
+  /***************************************/
  
   // Microphone
   // Wait for samples to be read 
@@ -458,6 +517,7 @@ void StreamManager::sense_and_send() {
     if(SERIAL_ENABLE) Serial.print("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO");
     audio_buffer_filled = false;
   }
+
   if (audio_buffer_i > 0) {
 
     // DEBUG: Print samples to the serial monitor or plotter
@@ -465,60 +525,68 @@ void StreamManager::sense_and_send() {
     //   Serial.println(sampleBuffer[i]);
     // }
 
-    if (!client.connected()) { 
-      if (VERBOSE) Serial.println();
-      if (VERBOSE) Serial.println("Server disconnected!");
-      client.stop();
-      this->switchOnLED("blue");
-      return;
-    }
-    else {      
+       
+    //TODO, can we send more mic packed all at once instead of doing this?
+    for (unsigned short i = 0; i < audio_buffer_i; i++) {
 
-      //TODO, can we send more mic packed all at once instead of doing this?
-      for (unsigned short i = 0; i < audio_buffer_i; i++) {
+      if (VERBOSE) Serial.println("Preparing audio packet ... ");
 
-        if (VERBOSE) Serial.println("Preparing audio packet ... ");
+      if (VERBOSE_TIME) start_time = micros();
 
-        if (VERBOSE_TIME) start_time = micros();
-        memcpy(im, &audioSize, int2bytesSize );                                                     // sizeof(audioSize) = int2bytesSize
-        memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                                       // sizeof(timestamp) = int2bytesSize
-        memcpy(im+int2bytesSize*2, &AUDIO_TYPE, sizeof(AUDIO_TYPE) );                               // sizeof(AUDIO_TYPE) = 1
-        memcpy(im+int2bytesSize*2+sizeof(AUDIO_TYPE), (uint8_t*)sampleBuffer[i], sample_buff_size );   // Note: int2bytesSize*2+sizeof(AUDIO_TYPE) = headerLength
-        if (VERBOSE_TIME) {
-          end_time = micros();
-          Serial.print("MIC TIME MEM (us)"); Serial.println(end_time-start_time);
-          start_time = micros();
-        }
-        client.write((uint8_t*)im, headerLength+sample_buff_size); 
-        if (VERBOSE_TIME) {
-          end_time = micros();
-          Serial.print("MIC TIME SEND (us)"); Serial.println(end_time-start_time);
-        }
-        if (VERBOSE) Serial.println("Sent audio packet ! ");
+      memcpy(im, &audioSize, int2bytesSize );                                                     // sizeof(audioSize) = int2bytesSize
+      memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                                       // sizeof(timestamp) = int2bytesSize
+      memcpy(im+int2bytesSize*2, &AUDIO_TYPE, sizeof(AUDIO_TYPE) );                               // sizeof(AUDIO_TYPE) = 1
+      memcpy(im+int2bytesSize*2+sizeof(AUDIO_TYPE), (uint8_t*)sampleBuffer[i], sample_buff_size );   // Note: int2bytesSize*2+sizeof(AUDIO_TYPE) = headerLength
+      
+      if (VERBOSE_TIME) {
+        end_time = micros();
+        Serial.print("MIC TIME MEM (us)"); Serial.println(end_time-start_time);
+        start_time = micros();
       }
-      audio_buffer_i = 0;
- 
+
+      if (connection_type){
+        client.write((uint8_t*)im, headerLength+sample_buff_size); 
+      }
+      else{
+        Udp.beginPacket(ip, port); 
+        Udp.write((uint8_t*)im, headerLength+sample_buff_size);
+        Udp.endPacket();
+      }      
+
+      if (VERBOSE_TIME) {
+        end_time = micros();
+        Serial.print("MIC TIME SEND (us)"); Serial.println(end_time-start_time);
+      }
+
+      if (VERBOSE) Serial.println("Sent audio packet ! ");
     }
 
-    // Clear the read count
-    samplesRead = 0;
+    audio_buffer_i = 0; // Clear the audio buffer index 
+    
+    samplesRead = 0; // Clear the read count
   }
+
+  /***************************************/
+  /***************************************/
 
   // Camera  
   if (camPtr->grabFrame(fb, 500) == 0) {  
 
     if (VERBOSE_TIME) start_time = micros();
+
     uint8_t* out_jpg = fb.getBuffer();
+
     if (VERBOSE_TIME) {
       end_time = micros();
       Serial.print("IMG TIME GET (us)"); Serial.println(end_time-start_time);
     }
 
-    for (int i = 0; i < 2; i++){       // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
+    for (int i = 0; i < 2; i++){  // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
       
       // 1. Convert half image from RGB565 to RGB888
       if (VERBOSE) Serial.println("Converting!!!"); 
       if (VERBOSE_TIME) start_time = micros();
+
       int idx = 0;
       int start = 0;
       if (i){
@@ -536,26 +604,28 @@ void StreamManager::sense_and_send() {
 
         idx += 3;
       }
+
       if (VERBOSE_TIME) {
         end_time = micros();
         Serial.print("IMG TIME CONVERT (us)"); Serial.println(end_time-start_time);
       }
 
-      // 2. Compress the half RGB888 image
-       
+      // 2. Compress the half RGB888 image       
       if (VERBOSE) Serial.println("Encoding started...");        
       if (VERBOSE_TIME) start_time = micros();
+
       jpgenc.open(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)); 
       jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_420, JPEGE_Q_LOW); 
       jpgenc.addFrame(&enc, im, 320 * 3); 
       out_jpg_len = jpgenc.close();
+
       if (VERBOSE_TIME) {
         end_time = micros();
         Serial.print("IMG TIME COMPRESS (us)"); Serial.println(end_time-start_time);
       }
       if (VERBOSE) {
-         Serial.println("Encoding closed!");
-         Serial.print("JPEG dimension (byte): "); 
+        Serial.println("Encoding closed!");
+        Serial.print("JPEG dimension (byte): "); 
         Serial.println(out_jpg_len);
       }
         
@@ -567,43 +637,44 @@ void StreamManager::sense_and_send() {
       // DEBUG:
       // client.write(out_jpg, out_jpg_len+sizeof(out_jpg_len));
 
-      if (!client.connected()) { 
-        if(SERIAL_ENABLE) Serial.println();
-        if(SERIAL_ENABLE) Serial.println("Server disconnected!");
-        client.stop();
-        this->switchOnLED("blue");
-        return;
+      if (VERBOSE) Serial.println("Preparing image packet ... ");
+      if (VERBOSE_TIME) start_time = micros();
+
+      imageSize = headerLength - int2bytesSize + out_jpg_len; 
+
+      memcpy(out_jpg, &imageSize, int2bytesSize );                        // sizeof(imageSize) = int2bytesSize
+      memcpy(out_jpg+int2bytesSize, &timestamp, int2bytesSize );          // sizeof(timestamp) = int2bytesSize
+      memcpy(out_jpg+int2bytesSize*2, &IMAGE_TYPE, sizeof(IMAGE_TYPE) );  // sizeof(IMAGE_TYPE) = 1
+      
+      if (VERBOSE_TIME) {
+        end_time = micros();
+        Serial.print("IMG TIME MEM (us)"); Serial.println(end_time-start_time);
+        start_time = micros();
       }
-      else {
 
-        if (VERBOSE) Serial.println("Preparing image packet ... ");
-        if (VERBOSE_TIME) start_time = micros();
-        imageSize = headerLength - int2bytesSize + out_jpg_len; 
-
-        memcpy(out_jpg, &imageSize, int2bytesSize );                        // sizeof(imageSize) = int2bytesSize
-        memcpy(out_jpg+int2bytesSize, &timestamp, int2bytesSize );          // sizeof(timestamp) = int2bytesSize
-        memcpy(out_jpg+int2bytesSize*2, &IMAGE_TYPE, sizeof(IMAGE_TYPE) );  // sizeof(IMAGE_TYPE) = 1
-        if (VERBOSE_TIME) {
-          end_time = micros();
-          Serial.print("IMG TIME MEM (us)"); Serial.println(end_time-start_time);
-          start_time = micros();
-        }
-
-        client.write(out_jpg, headerLength+out_jpg_len); 
-        if (VERBOSE_TIME) {
-          end_time = micros();
-          Serial.print("IMG TIME SEND (us)"); Serial.println(end_time-start_time);
-        }
-
-        if (VERBOSE) Serial.println("Sent image packet ! ");
+      if (connection_type){
+        client.write(out_jpg, headerLength+out_jpg_len);
       }
+      else{
+        Udp.beginPacket(ip, port); 
+        Udp.write(out_jpg, headerLength+out_jpg_len);
+        Udp.endPacket();
+      }
+
+      if (VERBOSE_TIME) {
+        end_time = micros();
+        Serial.print("IMG TIME SEND (us)"); Serial.println(end_time-start_time);
+      }
+
+      if (VERBOSE) Serial.println("Sent image packet ! ");
+      
     }   // end camera proc loop
   }  // end camera if
 
-    if (VERBOSE_TIME) {
-      Serial.println("END LOOP");
-      Serial.println("");
-    }
+  if (VERBOSE_TIME) {
+    Serial.println("END LOOP");
+    Serial.println("");
+  }
 
 }
 
@@ -614,12 +685,27 @@ void StreamManager::run() {
     this->connectWifi();
   }
 
-  if (!client.connected()) { 
-    this->switchOnLED("blue");
-    if (VERBOSE) Serial.println();
-    if (VERBOSE)  Serial.println("Server disconnected! Trying to establish new connection...");
-    client.stop();
-    this->startClientSocket();    
+  if (connection_type){
+    if (!client.connected()) { 
+      this->switchOnLED("blue");
+      if (VERBOSE) Serial.println();
+      if (VERBOSE)  Serial.println("Server disconnected! Trying to establish new connection...");
+      client.stop();
+      this->startClientSocket();    
+    }
+    else if (millis()-start_attempt_test >= 60000){
+      if(!this->testTCP()){
+        this->switchOnLED("blue");
+        // if (VERBOSE) Serial.println();
+        // if (VERBOSE)  
+        Serial.println("Server disconnected caught by test! Trying to establish new connection...");
+        client.stop();
+        this->startClientSocket(); 
+      }
+      else{
+        start_attempt_test = millis();
+      }
+    }
   }
 
   this->sense_and_send();
@@ -634,7 +720,7 @@ void setup() {
     Serial.begin(500000); //9600 921600
     while (!Serial) {
       ; // wait for serial port to connect. Needed for native USB port only
-  } 
+    } 
   }
  
   // DEBUG SIZE 
