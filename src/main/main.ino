@@ -300,11 +300,8 @@ void StreamManager::startClientSocket() {
     Serial.print("CONNECT TIME (us)"); Serial.println(end_time-start_time);
 
     while (!client.connected()) { 
-      client.stop();
-      start_time = micros();
-      client.connect(ip, port);
-      end_time = micros();
-      Serial.print("CONNECT TIME (us)"); Serial.println(end_time-start_time);
+      client.stop(); 
+      client.connect(ip, port);  
       if(SERIAL_ENABLE) Serial.println("Not connected, retrying...");
       delay(1000); // wait 3 seconds for connection:
     }
@@ -514,7 +511,7 @@ void StreamManager::sense_and_send() {
   // Microphone
   // Wait for samples to be read 
   if (audio_buffer_filled) {
-    if(SERIAL_ENABLE) Serial.print("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO");
+    if(SERIAL_ENABLE) Serial.println("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO\n");
     audio_buffer_filled = false;
   }
 
@@ -570,6 +567,119 @@ void StreamManager::sense_and_send() {
   /***************************************/
 
   // Camera  
+  // // // // OPTION 1 : LOW QUALITY COMPRESSION // // // //
+
+  // if (camPtr->grabFrame(fb, 500) == 0) {  
+
+  //   if (VERBOSE_TIME) start_time = micros();
+
+  //   uint8_t* out_jpg = fb.getBuffer();
+
+  //   if (VERBOSE_TIME) {
+  //     end_time = micros();
+  //     Serial.print("IMG TIME GET (us)"); Serial.println(end_time-start_time);
+  //   }
+
+  //   int offset_out_jpg = 0; 
+
+  //   for (int i = 0; i < 2; i++){  // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
+      
+  //     // 1. Convert half image from RGB565 to RGB888
+  //     if (VERBOSE) Serial.println("Converting!!!"); 
+  //     if (VERBOSE_TIME) start_time = micros();
+
+  //     int idx = 0;
+  //     int start = 0;
+  //     if (i){
+  //       start = (320*240*2)-1; 
+  //     }
+  //     else{
+  //       start = (320*240)-1; 
+  //     }
+  //     for (int j = start ; j > 320*240*i ; j -= 2 ){
+  //       uint16_t px = this->bytes_to_uint16(out_jpg[j-1], out_jpg[j]);
+
+  //       im[idx] = (px & 0xF800) >> 8;
+  //       im[idx+1] = (px & 0x07E0) >> 3;
+  //       im[idx+2] = (px & 0x001F) << 3;
+
+  //       idx += 3;
+  //     }
+
+  //     if (VERBOSE_TIME) {
+  //       end_time = micros();
+  //       Serial.print("IMG TIME CONVERT (us)"); Serial.println(end_time-start_time);
+  //     }
+
+  //     // 2. Compress the half RGB888 image       
+  //     if (VERBOSE) Serial.println("Encoding started...");        
+  //     if (VERBOSE_TIME) start_time = micros();
+
+  //     jpgenc.open(out_jpg+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE))+int2bytesSize*2+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE))); 
+  //     jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_444, JPEGE_Q_LOW); 
+  //     jpgenc.addFrame(&enc, im, 320 * 3); 
+  //     out_jpg_len = jpgenc.close();
+  //     if (!i){
+  //       offset_out_jpg = out_jpg_len; 
+  //     }
+
+  //     if (VERBOSE_TIME) {
+  //       end_time = micros();
+  //       Serial.print("IMG TIME COMPRESS (us)"); Serial.println(end_time-start_time);
+  //     }
+  //     if (VERBOSE) {
+  //       Serial.println("Encoding closed!");
+  //       Serial.print("JPEG dimension (byte): "); 
+  //       Serial.println(out_jpg_len);
+  //     }
+ 
+        
+  //     // DEBUG:
+  //     // memcpy(out_jpg, &out_jpg_len, int2bytesSize); // Copy the bytes of the dimension number into the array's head
+      
+      
+  //     // 3. Send it through TCP
+  //     // DEBUG:
+  //     // client.write(out_jpg, out_jpg_len+sizeof(out_jpg_len));
+
+  //     if (VERBOSE) Serial.println("Preparing image packet ... ");
+  //     if (VERBOSE_TIME) start_time = micros();
+
+  //     imageSize = headerLength - int2bytesSize + out_jpg_len; 
+
+  //     memcpy(out_jpg+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE)), &imageSize, int2bytesSize );                        // sizeof(imageSize) = int2bytesSize
+  //     memcpy(out_jpg+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE))+int2bytesSize, &timestamp, int2bytesSize );          // sizeof(timestamp) = int2bytesSize
+  //     memcpy(out_jpg+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE))+int2bytesSize*2, &IMAGE_TYPE, sizeof(IMAGE_TYPE) );  // sizeof(IMAGE_TYPE) = 1
+      
+      
+  //   }   // end camera proc loop
+
+  //   if (VERBOSE_TIME) {
+  //     end_time = micros();
+  //     Serial.print("IMG TIME MEM (us)"); Serial.println(end_time-start_time);
+  //     start_time = micros();
+  //   }
+
+  //   if (connection_type){
+  //     client.write(out_jpg, headerLength+out_jpg_len+headerLength+offset_out_jpg);
+  //   }
+  //   else{
+  //     Udp.beginPacket(ip, port); 
+  //     Udp.write(out_jpg, headerLength+out_jpg_len+headerLength+offset_out_jpg);
+  //     Udp.endPacket();
+  //   }
+
+  //   if (VERBOSE_TIME) {
+  //     end_time = micros();
+  //     Serial.print("IMG TIME SEND (us)"); Serial.println(end_time-start_time);
+  //   }
+
+  //   if (VERBOSE) Serial.println("Sent image packet ! ");
+
+  // }  // end camera if
+  
+  ///////////////////////////////////////////////////////////// 
+  // // // // OPTION 2: MEDIUM QUALITY COMPRESSION // // // //
   if (camPtr->grabFrame(fb, 500) == 0) {  
 
     if (VERBOSE_TIME) start_time = micros();
@@ -580,6 +690,8 @@ void StreamManager::sense_and_send() {
       end_time = micros();
       Serial.print("IMG TIME GET (us)"); Serial.println(end_time-start_time);
     }
+
+    int offset_out_jpg = 0; 
 
     for (int i = 0; i < 2; i++){  // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
       
@@ -614,10 +726,13 @@ void StreamManager::sense_and_send() {
       if (VERBOSE) Serial.println("Encoding started...");        
       if (VERBOSE_TIME) start_time = micros();
 
-      jpgenc.open(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)); 
-      jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_420, JPEGE_Q_LOW); 
+      jpgenc.open(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE)+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)+sizeof(IMAGE_TYPE)); ////
+      jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_444, JPEGE_Q_MED); 
       jpgenc.addFrame(&enc, im, 320 * 3); 
       out_jpg_len = jpgenc.close();
+      if (!i){
+        offset_out_jpg = out_jpg_len; 
+      }
 
       if (VERBOSE_TIME) {
         end_time = micros();
@@ -640,12 +755,20 @@ void StreamManager::sense_and_send() {
       if (VERBOSE) Serial.println("Preparing image packet ... ");
       if (VERBOSE_TIME) start_time = micros();
 
-      imageSize = headerLength - int2bytesSize + out_jpg_len; 
+      imageSize = headerLength - int2bytesSize + out_jpg_len + sizeof(IMAGE_TYPE);   ////
 
       memcpy(out_jpg, &imageSize, int2bytesSize );                        // sizeof(imageSize) = int2bytesSize
       memcpy(out_jpg+int2bytesSize, &timestamp, int2bytesSize );          // sizeof(timestamp) = int2bytesSize
       memcpy(out_jpg+int2bytesSize*2, &IMAGE_TYPE, sizeof(IMAGE_TYPE) );  // sizeof(IMAGE_TYPE) = 1
-      
+
+      if(!i){
+        memcpy(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE), &IMAGE_TYPE, sizeof(IMAGE_TYPE));  ////
+      }
+      else{
+        memcpy(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE), &AUDIO_TYPE, sizeof(AUDIO_TYPE));  ////
+      }
+
+
       if (VERBOSE_TIME) {
         end_time = micros();
         Serial.print("IMG TIME MEM (us)"); Serial.println(end_time-start_time);
@@ -657,7 +780,8 @@ void StreamManager::sense_and_send() {
       }
       else{
         Udp.beginPacket(ip, port); 
-        Udp.write(out_jpg, headerLength+out_jpg_len);
+        Udp.write(out_jpg, headerLength+out_jpg_len+sizeof(IMAGE_TYPE)); ////
+        // Udp.write(out_jpg+(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE)), headerLength+out_jpg_len);
         Udp.endPacket();
       }
 
@@ -669,6 +793,7 @@ void StreamManager::sense_and_send() {
       if (VERBOSE) Serial.println("Sent image packet ! ");
       
     }   // end camera proc loop
+
   }  // end camera if
 
   if (VERBOSE_TIME) {
