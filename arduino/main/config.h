@@ -10,6 +10,7 @@
 #define NETWORK_TYPE _UDP_	                     // _TCP_ or _UDP_
 #define ENABLE_ARDUINO_IDE_SERIAL_MONITOR false   // Must be false when using the board untethered to the Arduino IDE running PC
 #define ENABLE_VERBOSE false                      // Some debug prints, printed only when using the board tethered to the Arduino IDE running PC
+                                                 // ENABLE_ARDUINO_IDE_SERIAL_MONITOR must be true to be used
 #define ENABLE_VERBOSE_TIME false                 // Some more debug prints regarding execution times, printed only when using the board tethered to the Arduino IDE running PC
 
 #define USE_CAM true

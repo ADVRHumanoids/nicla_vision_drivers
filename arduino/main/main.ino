@@ -5,18 +5,15 @@
 #define VERBOSE_TIME SERIAL_ENABLE && ENABLE_VERBOSE_TIME
 
 #if defined(NETWORK_TYPE) && NETWORK_TYPE == _UDP_
-#include "NiclaWifiUdp.h"
-#include <SPI.h>
-#include <WiFi.h>
-#include <Arduino.h> 
-#define NETWORK_TYPE_STR "udp"
+  #define NETWORK_TYPE_STR "udp"
 #else
+  #define NETWORK_TYPE_STR "tcp"
+#endif
+
+#include "NiclaWifiUdp.h" //required in any case for compile the udp part
 #include <SPI.h>
 #include <WiFi.h>
 #include <Arduino.h> 
-#include "NiclaWifiUdp.h"
-#define NETWORK_TYPE_STR "tcp"
-#endif
 
 #include <memory>
 #include <functional>
@@ -125,8 +122,8 @@ class StreamManager {
     const unsigned int imuSize = headerLength - int2bytesSize + 6 * int2bytesSize;        // 6 Floats and each Float is 4 bytes (as the Int);
     const unsigned int distanceSize = headerLength - int2bytesSize + int2bytesSize;        // = 9 - 4 + 4 = 9   Note: this info is used in server -> we do -4 because pkg size is len(packet)-len(pkg size)) 
     #if USE_MIC
-    const unsigned int sample_buff_size = sizeof(sampleBuffer[0]); 
-    const unsigned int audioSize = headerLength - int2bytesSize + sample_buff_size;        // = 9 - 4 + sample_buff_size = 1029 
+      const unsigned int sample_buff_size = sizeof(sampleBuffer[0]); 
+      const unsigned int audioSize = headerLength - int2bytesSize + sample_buff_size;        // = 9 - 4 + sample_buff_size = 1029 
     #endif
 
     unsigned int imageSize = 0;                                                            // imageSize is variable, it depends on the compression
@@ -134,7 +131,6 @@ class StreamManager {
 
     unsigned long timestamp = 0;
     //generic data buffer for multiple sensors. Size is the max data (images). 
-    //TODO reduce buffer size if no image are used?
     #if USE_CAM      
       uint8_t data_buffer[320*120*3]; //images use different buf for sending
     #elif USE_MIC
@@ -340,8 +336,10 @@ void StreamManager::startClientSocket() {
     client.connect(ip, port); 
 
     end_time = micros();
-    Serial.print("CONNECT TIME (us)"); Serial.println(end_time-start_time);
-
+    if(SERIAL_ENABLE) {
+       Serial.print("CONNECT TIME (us)"); 
+       Serial.println(end_time-start_time);
+    }
     while (!client.connected()) { 
       client.stop(); 
       client.connect(ip, port);  
@@ -871,7 +869,7 @@ void StreamManager::sense_and_send() {
       }
 
       if (connection_type){
-        client.write(out_jpg, headerLength+out_jpg_len);
+        client.write(out_jpg, headerLength+out_jpg_len+sizeof(IMAGE_TYPE));
       }
       else{
         Udp.beginPacket(ip, port); 
@@ -914,7 +912,7 @@ void StreamManager::run() {
     if (!client.connected()) { 
       this->switchOnLED("blue");
       if (VERBOSE) Serial.println();
-      if (VERBOSE)  Serial.println("Server disconnected! Trying to establish new connection...");
+      if (VERBOSE) Serial.println("Server disconnected! Trying to establish new connection...");
       client.stop();
       this->startClientSocket();    
     }
