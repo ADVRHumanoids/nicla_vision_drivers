@@ -2,10 +2,10 @@
 
 #define SERIAL_ENABLE ENABLE_ARDUINO_IDE_SERIAL_MONITOR
 #define VERBOSE SERIAL_ENABLE && ENABLE_VERBOSE
-#define VERBOSE_TIME SERIAL_ENABLE && false  //internal debug for operation's time 
+#define VERBOSE_TIME SERIAL_ENABLE && ENABLE_VERBOSE_TIME
 
 #if defined(NETWORK_TYPE) && NETWORK_TYPE == _UDP_
-#include "MyWifiUdp.h"
+#include "NiclaWifiUdp.h"
 #include <SPI.h>
 #include <WiFi.h>
 #include <Arduino.h> 
@@ -14,17 +14,27 @@
 #include <SPI.h>
 #include <WiFi.h>
 #include <Arduino.h> 
-#include "MyWifiUdp.h"
+#include "NiclaWifiUdp.h"
 #define NETWORK_TYPE_STR "tcp"
 #endif
 
-
-#include "gc2145.h" 
-#include <PDM.h>
 #include <memory>
 #include <functional>
-#include <JPEGENC.h>
-#include "VL53L1X.h"
+
+#if USE_CAM
+  #include "gc2145.h"
+  #include <JPEGENC.h>
+#endif
+#if USE_MIC 
+  #include <PDM.h>
+#endif
+#if USE_TOF
+  #include "VL53L1X.h"
+#endif
+#if USE_IMU
+  #include <Arduino_LSM6DSOX.h>
+#endif
+
 
  
 #define IMAGE_MODE CAMERA_RGB565
@@ -62,8 +72,6 @@ class StreamManager {
     void startClientSocket();
     uint8_t testTCP();
     void initSensors();
-    void onPDMdata();
-    static void staticCallback(); 
     void sense_and_send();
     void run();
     uint16_t bytes_to_uint16(byte byte1, byte byte2);
@@ -102,7 +110,7 @@ class StreamManager {
     WiFiClient test_connection_client;
     unsigned long start_attempt_test;
     // UDP Client 
-    MyWifiUDP Udp;
+    NiclaWifiUDP Udp;
 
     // # Define data types for headers (1 byte)
     const uint8_t IMAGE_TYPE = 0;     //0b00;
@@ -112,41 +120,76 @@ class StreamManager {
 
     // # Defining package dimensions (bytes) utils
     const unsigned int int2bytesSize = 4; 
-    const unsigned int sample_buff_size = sizeof(sampleBuffer[0]); 
     const unsigned int packetSize = 65000;
     const unsigned int headerLength = int2bytesSize + int2bytesSize + sizeof(IMAGE_TYPE);  // bytes (pkg size + timestamp size + data type size) = 4 + 4 + 1 =  9
-    const unsigned int imuSize_ = headerLength - int2bytesSize + 6 * int2bytesSize;        // 6 Floats and each Float is 4 bytes (as the Int);
+    const unsigned int imuSize = headerLength - int2bytesSize + 6 * int2bytesSize;        // 6 Floats and each Float is 4 bytes (as the Int);
     const unsigned int distanceSize = headerLength - int2bytesSize + int2bytesSize;        // = 9 - 4 + 4 = 9   Note: this info is used in server -> we do -4 because pkg size is len(packet)-len(pkg size)) 
+    #if USE_MIC
+    const unsigned int sample_buff_size = sizeof(sampleBuffer[0]); 
     const unsigned int audioSize = headerLength - int2bytesSize + sample_buff_size;        // = 9 - 4 + sample_buff_size = 1029 
+    #endif
+
     unsigned int imageSize = 0;                                                            // imageSize is variable, it depends on the compression
 
 
     unsigned long timestamp = 0;
+    //generic data buffer for multiple sensors. Size is the max data (images). 
+    //TODO reduce buffer size if no image are used?
+    #if USE_CAM      
+      uint8_t data_buffer[320*120*3]; //images use different buf for sending
+    #elif USE_MIC
+      uint8_t data_buffer[9+512*2+10]; //headerLength + 512*short + un qualcosa nonsisamai
+    #elif USE_IMU
+      uint8_t data_buffer[9+6*4+10]; //headerLength + 6*float + un qualcosa nonsisamai
+    #else
+      uint8_t data_buffer[9+4+10]; //headerLength + int + un qualcosa nonsisamai
+    #endif
 
-    // Camera        
-    GC2145 nicla_cam; 
-    std::shared_ptr<Camera> camPtr;       
-    int sample_rate = 60; 
-    JPEGENC jpgenc;
-    JPEGENCODE enc; 
-    FrameBuffer fb; 
-    int out_jpg_len;
-    uint8_t im[320*120*3];
-    // uint8_t fake_img[153600];
+
+
+
+
+    // Camera  
+    #if USE_CAM      
+      GC2145 nicla_cam; 
+      std::shared_ptr<Camera> camPtr;       
+      int sample_rate = 60; 
+      JPEGENC jpgenc;
+      JPEGENCODE enc; 
+      FrameBuffer fb; 
+      int out_jpg_len;
+      // uint8_t fake_img[153600];
+    #endif
     
 
     // Microphone
-    static const char channels = 1; // default number of output channels
-    static const int frequency = 16000; // default PCM output frequency  
-    static const short audio_buffer_size = 10; 
-    volatile bool audio_buffer_filled = false;
-    short sampleBuffer[10][512]; // Buffers to read samples into, each sample is 16-bits
-    unsigned short audio_buffer_i = 0; // index for audio buffers
-    volatile int samplesRead; // Number of audio samples read
+    #if USE_MIC      
+      static const char channels = 1; // default number of output channels
+      static const int frequency = 16000; // default PCM output frequency  
+      static const short audio_buffer_size = 10; 
+      short sampleBuffer[10][512]; // Buffers to read samples into, each sample is 16-bits
+      volatile bool audio_buffer_filled = false;
+      unsigned short audio_buffer_i = 0; // index for audio buffers
+      volatile int samplesRead; // Number of audio samples read
+      void onPDMdata();
+      static void staticCallback(); 
+    #endif
 
     // ToF
-    VL53L1X proximity;
-    int reading = 0;
+    #if USE_TOF
+      VL53L1X proximity;
+      int reading = 0;
+    #endif
+
+    // IMU
+    #if USE_IMU
+      float acc_x = 0;
+      float acc_y = 0;
+      float acc_z = 0;
+      float gyro_x = 0;
+      float gyro_y = 0; 
+      float gyro_z = 0;
+    #endif
 
     //Debug - Verbose stuff
     unsigned long start_time;
@@ -180,9 +223,9 @@ StreamManager::StreamManager(const char* _ssid_, const char* _pwd_,
   // }
 
   // for (int i = 0; i < 320*120*3; i = i+3) {
-  //   im[i] = 255;
-  //   im[i+1] = 0;
-  //   im[i+2] = 0;
+  //   data_buffer[i] = 255;
+  //   data_buffer[i+1] = 0;
+  //   data_buffer[i+2] = 0;
   // }
 
 }
@@ -339,7 +382,7 @@ uint8_t StreamManager::testTCP() {
   }
 }
 
-
+#if USE_MIC
 /**
  * Callback function to process the data from the PDM microphone.
  * NOTE: This callback is executed as part of an ISR.
@@ -362,9 +405,8 @@ void StreamManager::onPDMdata() {
     audio_buffer_filled = true;
     audio_buffer_i = 0;
   }
-
-
 }
+#endif
 
 /**************************************************************************************/
 // Create StreamManager object
@@ -372,66 +414,78 @@ IPAddress remoteIP(_IP_);
 StreamManager stream_manager(NETWORK_SSID, NETWORK_KEY, remoteIP, NETWORK_TYPE_STR);
 /**************************************************************************************/
 
+#if USE_MIC
 // Static member function as a trampoline for the callback 
 void StreamManager::staticCallback() {
     // Call the actual member function using the instance pointer
     stream_manager.onPDMdata();
 }
+#endif
 
 
 void StreamManager::initSensors() {
 
   if(SERIAL_ENABLE) Serial.println("\nInitiating sensors...!\n");
 
-  // Camera  
-  camPtr = std::make_shared<Camera>(nicla_cam);
-   
-  // Init the cam QVGA, 30FPS 
-  if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, sample_rate)) {
-    if(SERIAL_ENABLE) Serial.println("\nCamera not available!\n");
-    this->switchOnLED("red");
-  }
 
-  if(SERIAL_ENABLE) Serial.println("\nCamera DONE...!\n");
+  #if USE_IMU
+    if (!IMU.begin()) {
+      if(SERIAL_ENABLE) Serial.println("\nFailed to initialize IMU!");
+      this->switchOnLED("red");
+    }
+    if(SERIAL_ENABLE) Serial.println("\nIMU DONE...!\n");
+  #endif
+
+
+  #if USE_CAM      
+    camPtr = std::make_shared<Camera>(nicla_cam);
+    
+    // Init the cam QVGA, 30FPS 
+    if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, sample_rate)) {
+      if(SERIAL_ENABLE) Serial.println("\nCamera not available!\n");
+      this->switchOnLED("red");
+    }
+
+    if(SERIAL_ENABLE) Serial.println("\nCamera DONE...!\n");
+  #endif
  
-  
 
-  // ToF
-  Wire1.begin();
-  Wire1.setClock(400000); // use 400 kHz I2C
-  proximity.setBus(&Wire1);
+  #if USE_TOF
+    Wire1.begin();
+    Wire1.setClock(400000); // use 400 kHz I2C
+    proximity.setBus(&Wire1);
 
-  if (!proximity.init()) {
-    if(SERIAL_ENABLE) Serial.println("\nFailed to detect and initialize sensor!");
-    this->switchOnLED("red");
-  }
+    if (!proximity.init()) {
+      if(SERIAL_ENABLE) Serial.println("\nFailed to detect and initialize sensor!");
+      this->switchOnLED("red");
+    }
 
-  proximity.setDistanceMode(VL53L1X::Long);
-  proximity.setMeasurementTimingBudget(10000);
-  proximity.startContinuous(10);
+    proximity.setDistanceMode(VL53L1X::Medium);
+    proximity.setMeasurementTimingBudget(50000); //in microseconds
+    proximity.startContinuous(50); //comment is readsingle() is used
 
-  if(SERIAL_ENABLE) Serial.println("\nToF DONE...!\n");
+    if(SERIAL_ENABLE) Serial.println("\nToF DONE...!\n");
+  #endif
 
 
+  #if USE_MIC    
+    PDM.onReceive(StreamManager::staticCallback);  // Configure the data receive callback
+    // PDM.onReceive(onPDMdataProva);
 
-  // Microphone     
-  PDM.onReceive(StreamManager::staticCallback);  // Configure the data receive callback
-  // PDM.onReceive(onPDMdataProva);
+    // Optionally set the gain
+    // Defaults to 20 on the BLE Sense and 24 on the Portenta Vision Shield
+    // PDM.setGain(30);
 
-  // Optionally set the gain
-  // Defaults to 20 on the BLE Sense and 24 on the Portenta Vision Shield
-  // PDM.setGain(30);
-
-  // Initialize PDM with:
-  // - one channel (mono mode)
-  // - a 16 kHz sample rate for the Arduino Nano 33 BLE Sense
-  // - a 32 kHz or 64 kHz sample rate for the Arduino Portenta Vision Shield
-  if (!PDM.begin(channels, frequency)) {
-    if(SERIAL_ENABLE) Serial.println("\nFailed to start PDM!");
-    this->switchOnLED("red");
-  }
-
-  if(SERIAL_ENABLE) Serial.println("\nMic DONE...!\n");
+    // Initialize PDM with:
+    // - one channel (mono mode)
+    // - a 16 kHz sample rate for the Arduino Nano 33 BLE Sense
+    // - a 32 kHz or 64 kHz sample rate for the Arduino Portenta Vision Shield
+    if (!PDM.begin(channels, frequency)) {
+      if(SERIAL_ENABLE) Serial.println("\nFailed to start PDM!");
+      this->switchOnLED("red");
+    }
+    if(SERIAL_ENABLE) Serial.println("\nMic DONE...!\n");
+  #endif
 
 
   if(SERIAL_ENABLE) Serial.println("Init Sensors DONE !\n");
@@ -454,13 +508,14 @@ void StreamManager::sense_and_send() {
       Serial.println(timestamp);
   }
 
-  // ToF
+  #if USE_TOF
   if (VERBOSE_TIME){
     Serial.println("START LOOP");
     start_time = micros();
   } 
 
-  reading = proximity.read();
+  reading = proximity.read(); //default blocking
+  //reading = proximity.readSingle(); //default blocking
 
   if (VERBOSE_TIME) {
     end_time = micros();
@@ -476,10 +531,10 @@ void StreamManager::sense_and_send() {
   
   if (VERBOSE_TIME) start_time = micros();
 
-  memcpy(im, &distanceSize, int2bytesSize );                                  // sizeof(distanceSize) = int2bytesSize
-  memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
-  memcpy(im+int2bytesSize*2, &DISTANCE_TYPE, sizeof(DISTANCE_TYPE) );         // sizeof(DISTANCE_TYPE) = 1
-  memcpy(im+int2bytesSize*2+sizeof(DISTANCE_TYPE), &reading, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  memcpy(data_buffer, &distanceSize, int2bytesSize );                                  // sizeof(distanceSize) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2, &DISTANCE_TYPE, sizeof(DISTANCE_TYPE) );         // sizeof(DISTANCE_TYPE) = 1
+  memcpy(data_buffer+int2bytesSize*2+sizeof(DISTANCE_TYPE), &reading, int2bytesSize ); // sizeof(reading) = int2bytesSize
   
   if (VERBOSE_TIME) {
     end_time = micros();
@@ -489,11 +544,11 @@ void StreamManager::sense_and_send() {
   }
 
   if (connection_type){
-    client.write((uint8_t*)im, headerLength+int2bytesSize);
+    client.write((uint8_t*)data_buffer, headerLength+int2bytesSize);
   }
   else{
     Udp.beginPacket(ip, port); 
-    Udp.write((uint8_t*)im, headerLength+int2bytesSize);
+    Udp.write((uint8_t*)data_buffer, headerLength+int2bytesSize);
     Udp.endPacket();
   }
     
@@ -504,11 +559,52 @@ void StreamManager::sense_and_send() {
   }
 
   if (VERBOSE) Serial.println("Sent distance packet ! ");
-     
+
+  #endif //USE_TOF
   /***************************************/
+
+  #if USE_IMU
+
+  if (IMU.accelerationAvailable()) {
+      IMU.readAcceleration(acc_x, acc_y, acc_z);
+  } 
+
+  if (IMU.gyroscopeAvailable()) {
+    IMU.readGyroscope(gyro_x, gyro_y, gyro_z);
+  }
+
+  if (VERBOSE){
+    Serial.print("IMU reading: "); 
+    Serial.print(acc_x); Serial.print('\t'); Serial.print(acc_y); Serial.print('\t'); Serial.println(acc_z); Serial.println();
+    Serial.print(gyro_x); Serial.print('\t'); Serial.print(gyro_y); Serial.print('\t'); Serial.println(gyro_z); Serial.println();
+    Serial.println("Preparing IMU packet ... ");
+  } 
+
+  memcpy(data_buffer, &imuSize, int2bytesSize );                                  // sizeof(imuSize) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize, &timestamp, int2bytesSize );                       // sizeof(timestamp) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2, &IMU_TYPE, sizeof(IMU_TYPE) );         // sizeof(IMU_TYPE) = 1
+  memcpy(data_buffer+int2bytesSize*2+sizeof(IMU_TYPE), &acc_x, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2+sizeof(IMU_TYPE)+int2bytesSize, &acc_y, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2+sizeof(IMU_TYPE)+(2*int2bytesSize), &acc_z, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2+sizeof(IMU_TYPE)+(3*int2bytesSize), &gyro_x, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2+sizeof(IMU_TYPE)+(4*int2bytesSize), &gyro_y, int2bytesSize ); // sizeof(reading) = int2bytesSize
+  memcpy(data_buffer+int2bytesSize*2+sizeof(IMU_TYPE)+(5*int2bytesSize), &gyro_z, int2bytesSize ); // sizeof(reading) = int2bytesSize
+
+  if (connection_type){
+    client.write((uint8_t*)data_buffer, headerLength+6*int2bytesSize);
+  }
+  else{
+    Udp.beginPacket(ip, port); 
+    Udp.write((uint8_t*)data_buffer, headerLength+6*int2bytesSize);
+    Udp.endPacket();
+  }
+
+  if (VERBOSE) Serial.println("Sent IMU packet ! ");
+  #endif //USE_IMU
+
   /***************************************/
  
-  // Microphone
+  #if USE_MIC
   // Wait for samples to be read 
   if (audio_buffer_filled) {
     if(SERIAL_ENABLE) Serial.println("AUDIO BUFFER HAS BEEN FILLED! BAD THINGS WILL HAPPEN WITH AUDIO\n");
@@ -530,10 +626,10 @@ void StreamManager::sense_and_send() {
 
       if (VERBOSE_TIME) start_time = micros();
 
-      memcpy(im, &audioSize, int2bytesSize );                                                     // sizeof(audioSize) = int2bytesSize
-      memcpy(im+int2bytesSize, &timestamp, int2bytesSize );                                       // sizeof(timestamp) = int2bytesSize
-      memcpy(im+int2bytesSize*2, &AUDIO_TYPE, sizeof(AUDIO_TYPE) );                               // sizeof(AUDIO_TYPE) = 1
-      memcpy(im+int2bytesSize*2+sizeof(AUDIO_TYPE), (uint8_t*)sampleBuffer[i], sample_buff_size );   // Note: int2bytesSize*2+sizeof(AUDIO_TYPE) = headerLength
+      memcpy(data_buffer, &audioSize, int2bytesSize );                                                     // sizeof(audioSize) = int2bytesSize
+      memcpy(data_buffer+int2bytesSize, &timestamp, int2bytesSize );                                       // sizeof(timestamp) = int2bytesSize
+      memcpy(data_buffer+int2bytesSize*2, &AUDIO_TYPE, sizeof(AUDIO_TYPE) );                               // sizeof(AUDIO_TYPE) = 1
+      memcpy(data_buffer+int2bytesSize*2+sizeof(AUDIO_TYPE), (uint8_t*)sampleBuffer[i], sample_buff_size );   // Note: int2bytesSize*2+sizeof(AUDIO_TYPE) = headerLength
       
       if (VERBOSE_TIME) {
         end_time = micros();
@@ -542,11 +638,11 @@ void StreamManager::sense_and_send() {
       }
 
       if (connection_type){
-        client.write((uint8_t*)im, headerLength+sample_buff_size); 
+        client.write((uint8_t*)data_buffer, headerLength+sample_buff_size); 
       }
       else{
         Udp.beginPacket(ip, port); 
-        Udp.write((uint8_t*)im, headerLength+sample_buff_size);
+        Udp.write((uint8_t*)data_buffer, headerLength+sample_buff_size);
         Udp.endPacket();
       }      
 
@@ -562,11 +658,10 @@ void StreamManager::sense_and_send() {
     
     samplesRead = 0; // Clear the read count
   }
-
+  #endif //USE_MIC
   /***************************************/
-  /***************************************/
 
-  // Camera  
+  #if USE_CAM      
   // // // // OPTION 1 : LOW QUALITY COMPRESSION // // // //
 
   // if (camPtr->grabFrame(fb, 500) == 0) {  
@@ -599,9 +694,9 @@ void StreamManager::sense_and_send() {
   //     for (int j = start ; j > 320*240*i ; j -= 2 ){
   //       uint16_t px = this->bytes_to_uint16(out_jpg[j-1], out_jpg[j]);
 
-  //       im[idx] = (px & 0xF800) >> 8;
-  //       im[idx+1] = (px & 0x07E0) >> 3;
-  //       im[idx+2] = (px & 0x001F) << 3;
+  //       data_buffer[idx] = (px & 0xF800) >> 8;
+  //       data_buffer[idx+1] = (px & 0x07E0) >> 3;
+  //       data_buffer[idx+2] = (px & 0x001F) << 3;
 
   //       idx += 3;
   //     }
@@ -617,7 +712,7 @@ void StreamManager::sense_and_send() {
 
   //     jpgenc.open(out_jpg+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE))+int2bytesSize*2+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)+i*(offset_out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE))); 
   //     jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_444, JPEGE_Q_LOW); 
-  //     jpgenc.addFrame(&enc, im, 320 * 3); 
+  //     jpgenc.addFrame(&enc, data_buffer, 320 * 3); 
   //     out_jpg_len = jpgenc.close();
   //     if (!i){
   //       offset_out_jpg = out_jpg_len; 
@@ -710,9 +805,9 @@ void StreamManager::sense_and_send() {
       for (int j = start ; j > 320*240*i ; j -= 2 ){
         uint16_t px = this->bytes_to_uint16(out_jpg[j-1], out_jpg[j]);
 
-        im[idx] = (px & 0xF800) >> 8;
-        im[idx+1] = (px & 0x07E0) >> 3;
-        im[idx+2] = (px & 0x001F) << 3;
+        data_buffer[idx] = (px & 0xF800) >> 8;
+        data_buffer[idx+1] = (px & 0x07E0) >> 3;
+        data_buffer[idx+2] = (px & 0x001F) << 3;
 
         idx += 3;
       }
@@ -728,7 +823,7 @@ void StreamManager::sense_and_send() {
 
       jpgenc.open(out_jpg+int2bytesSize*2+sizeof(IMAGE_TYPE)+sizeof(IMAGE_TYPE), 32768-int2bytesSize*2+sizeof(IMAGE_TYPE)+sizeof(IMAGE_TYPE)); ////
       jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_444, JPEGE_Q_MED); 
-      jpgenc.addFrame(&enc, im, 320 * 3); 
+      jpgenc.addFrame(&enc, data_buffer, 320 * 3); 
       out_jpg_len = jpgenc.close();
       if (!i){
         offset_out_jpg = out_jpg_len; 
@@ -796,6 +891,11 @@ void StreamManager::sense_and_send() {
 
   }  // end camera if
 
+  #endif //USE_CAM
+
+  /***************************************/
+
+
   if (VERBOSE_TIME) {
     Serial.println("END LOOP");
     Serial.println("");
@@ -823,7 +923,7 @@ void StreamManager::run() {
         this->switchOnLED("blue");
         // if (VERBOSE) Serial.println();
         // if (VERBOSE)  
-        Serial.println("Server disconnected caught by test! Trying to establish new connection...");
+        if(SERIAL_ENABLE) Serial.println("Server disconnected caught by test! Trying to establish new connection...");
         client.stop();
         this->startClientSocket(); 
       }
@@ -855,6 +955,9 @@ void setup() {
   // Serial.print("SIZE OF SHORT: ");
   // Serial.println(sizeof(short));
 
+  // Serial.print("SIZE OF FLOAT: ");
+  // Serial.println(sizeof(float));
+
   // Serial.print("SIZE OF MILLIS (TIME): ");
   // Serial.print(sizeof(unsigned long));
   // Serial.print(" MILLIS: ");
@@ -876,9 +979,6 @@ void setup() {
 
   stream_manager.initSensors();
 
-
-
-
   stream_manager.switchOnLED("green");
 
   delay(3000);
@@ -887,9 +987,6 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-
-    
 
   stream_manager.run(); 
 }

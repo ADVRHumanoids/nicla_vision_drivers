@@ -1,14 +1,14 @@
  
 
-#ifndef MYMBEDSOCKETCLASS_H
-#define MYMBEDSOCKETCLASS_H
+#ifndef NICLA_MBED_SOCKET_CLASS_H
+#define NICLA_MBED_SOCKET_CLASS_H
 
 #include <Arduino.h>
 #include "netsocket/NetworkInterface.h"
 
 //namespace arduino {
 
-class MyMbedSocketClass {
+class NiclaMbedSocketClass {
 
 public:
   void config(IPAddress local_ip);
@@ -120,7 +120,7 @@ public:
   void setFeedWatchdogFunc(voidFuncPtr func);
   void feedWatchdog();
 
-  friend class MyMbedUDP;
+  friend class NiclaMbedUDP;
   friend class MbedServer;
   friend class MbedClient;
 
@@ -143,8 +143,8 @@ protected:
   static nsapi_error_t gethostbyname(NetworkInterface* interface, const char* aHostname, SocketAddress* socketAddress);
 };
 
-using MySocketHelpers = MyMbedSocketClass;
+using NiclaSocketHelpers = NiclaMbedSocketClass;
 
 //}
 
-#endif
+#endif //NICLA_MBED_SOCKET_CLASS_H

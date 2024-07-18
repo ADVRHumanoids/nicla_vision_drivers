@@ -24,25 +24,61 @@ Here a list of the available sensors onboard the Arduino Nicla Vision board:
 - **Imu**
 
 ## Table of Contents 
-1. [Installation](#installation)
-2. [Usage](#usage)
+1. [Arduino](#arduino)
+2. [Micropython](#micropython)
 3. [Package List](#package-list)
 4. [Video](#video-demonstration)
 5. [License](#license)
 6. [Cite](#citation)
    
 -------------------
+# Arduino
+**suggested**  
+The Arduino version is the one suggested, working, and the one that will be maintained. 
 
-# Installation
+## Installation (Arduino)
+Step-by-step instructions on how to get the drivers running onboard the Arduino Nicla Vision:
+
+1. Download [Arduino IDE](https://www.arduino.cc/en/software). For any additional info you can check the official [Arduino Nicla Vision doc](https://docs.arduino.cc/hardware/nicla-vision/)
+2. Install the necessary core from Arduino IDE (*Tools > Board > Boards Manager...*): **Mbed OS Nicla Boards**
+2. Download the necessary libraries from Arduino IDE (*Tools -> Manage Libraries*). Depending on the Nicla sensor you have to install:
+  - **IMU** Arduino_LSM6DSOX by *Arduino*
+  - **Camera** JPEGENC by *Larry Bank*
+  - **TOF** VL53L1X by *Pololu*
+  - **Microphone** *nothing*
+3. Download the *arduino/main* folder of this repo.
+4. Modify accordingly the ```config.h``` file for network and sensors configuration.
+5. Open the ```main.ino``` file in Arduino IDE and upload it on the Nicla.
+
+## Usage (Arduino)
+Follow the below two steps for enjoying your Arduino Nicla Vision board! 🚀
+
+1. Just power the board and wait for leds check. Note that ```ENABLE_ARDUINO_IDE_SERIAL_MONITOR``` in the config file must be set to false when the board is not tethered to a Arduino IDE running pc.
+  
+**Note:** Look at the LED of your board! The first seconds after having turned it on, the LED should be Green or Blue.
+   - When the board is correctly connected and it is streaming, the LED will turn off.
+   - If you are having connection issues, the LED turns Blue.
+   - If you are having other runtime errors, the LED turns Red.
+
+:sunny: Now you are ready to go!
+Check out the [Nicla Vision ROS2 repository](https://github.com/ADVRHumanoids/nicla_vision_ros2.git) or the [Nicla Vision ROS repository](https://github.com/ADVRHumanoids/nicla_vision_ros.git) for unlocking the Nicla Vision board in the ROS ecosystem! :sunny:
+
+
+# Micropython
+**unmaintained**  
+We had problems with the micropython library for the microphone, but the rest of the sensors should be good. 
+Anyway, we are not maintaining the micropython version anymore, having switched to the Arduino version definetevely.
+
+## Installation (micropython)
 Step-by-step instructions on how to get the drivers running onboard the Arduino Nicla Vision:
 
 1. Connect the board to the pc.
 2. If it is your first time with the board, please follow the [Getting Started tutorial here](https://docs.arduino.cc/tutorials/nicla-vision/getting-started/), for getting the latest available firmware of the board through OpenMV IDE.
 3. Download the `scripts/main.py` and `scripts/config.json` files of this repository 
-5. Copy the `main.py` and `config.json` files ìnside the memory of the Nicla Vision board.
-6. Reboot the board (unplug and plug again the board to the pc)
+4. Copy the `main.py` and `config.json` files ìnside the memory of the Nicla Vision board.
+5. Reboot the board (unplug and plug again the board to the pc)
 
-# Usage 
+## Usage (micropython)
 Follow the below two steps for enjoying your Arduino Nicla Vision board! 🚀
 
 1. Turn on a Hotspot connection on your pc.

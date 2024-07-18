@@ -1,17 +1,17 @@
-#include "MyMbedUdp.h"
+#include "NiclaMbedUdp.h"
 
-MyMbedUDP::MyMbedUDP() {
+NiclaMbedUDP::NiclaMbedUDP() {
   _packet_buffer = new uint8_t[WIFI_UDP_BUFFER_SIZE];
   _current_packet = NULL;
   _current_packet_size = 0;
   // if this allocation fails then ::begin will fail
 }
 
-MyMbedUDP::~MyMbedUDP() {
+NiclaMbedUDP::~NiclaMbedUDP() {
   delete[] _packet_buffer;
 }
 
-uint8_t MyMbedUDP::begin(uint16_t port) {
+uint8_t NiclaMbedUDP::begin(uint16_t port) {
   // success = 1, fail = 0
 
   nsapi_error_t rt = _socket.open(getNetwork());
@@ -33,13 +33,13 @@ uint8_t MyMbedUDP::begin(uint16_t port) {
   return 1;
 }
 
-uint8_t MyMbedUDP::beginMulticast(IPAddress ip, uint16_t port) {
+uint8_t NiclaMbedUDP::beginMulticast(IPAddress ip, uint16_t port) {
   // success = 1, fail = 0
   if (begin(port) != 1) {
     return 0;
   }
 
-  SocketAddress socketAddress = MySocketHelpers::socketAddressFromIpAddress(ip, port);
+  SocketAddress socketAddress = NiclaSocketHelpers::socketAddressFromIpAddress(ip, port);
 
   if (_socket.join_multicast_group(socketAddress) != NSAPI_ERROR_OK) {
     //printf("Error joining the multicast group\n");
@@ -49,26 +49,26 @@ uint8_t MyMbedUDP::beginMulticast(IPAddress ip, uint16_t port) {
   return 1;
 }
 
-void MyMbedUDP::stop() {
+void NiclaMbedUDP::stop() {
   _socket.close();
 }
 
-int MyMbedUDP::beginPacket(IPAddress ip, uint16_t port) {
-  _host = MySocketHelpers::socketAddressFromIpAddress(ip, port);
+int NiclaMbedUDP::beginPacket(IPAddress ip, uint16_t port) {
+  _host = NiclaSocketHelpers::socketAddressFromIpAddress(ip, port);
   //If IP is null and port is 0 the initialization failed
   txBuffer.clear();
   return (_host.get_ip_address() == nullptr && _host.get_port() == 0) ? 0 : 1;
 }
 
-int MyMbedUDP::beginPacket(const char *host, uint16_t port) {
+int NiclaMbedUDP::beginPacket(const char *host, uint16_t port) {
   _host = SocketAddress(host, port);
   txBuffer.clear();
-  MySocketHelpers::gethostbyname(getNetwork(), host, &_host);
+  NiclaSocketHelpers::gethostbyname(getNetwork(), host, &_host);
   //If IP is null and port is 0 the initialization failed
   return (_host.get_ip_address() == nullptr && _host.get_port() == 0) ? 0 : 1;
 }
 
-int MyMbedUDP::endPacket() {
+int NiclaMbedUDP::endPacket() {
   _socket.set_blocking(true);
   _socket.set_timeout(1000);
 
@@ -88,12 +88,12 @@ int MyMbedUDP::endPacket() {
 }
 
 // Write a single byte into the packet
-size_t MyMbedUDP::write(uint8_t byte) {
+size_t NiclaMbedUDP::write(uint8_t byte) {
   return write(&byte, 1);
 }
 
 // Write size bytes from buffer into the packet
-size_t MyMbedUDP::write(const uint8_t *buffer, size_t size) {
+size_t NiclaMbedUDP::write(const uint8_t *buffer, size_t size) {
   for (int i = 0; i<size; i++) {
     if (txBuffer.availableForStore()) {
       txBuffer.store_char(buffer[i]);
@@ -104,7 +104,7 @@ size_t MyMbedUDP::write(const uint8_t *buffer, size_t size) {
   return size;
 }
 
-int MyMbedUDP::parsePacket() {
+int NiclaMbedUDP::parsePacket() {
   nsapi_size_or_error_t ret = _socket.recvfrom(&_remoteHost, _packet_buffer, WIFI_UDP_BUFFER_SIZE);
 
   if (ret == NSAPI_ERROR_WOULD_BLOCK) {
@@ -127,12 +127,12 @@ int MyMbedUDP::parsePacket() {
   return _current_packet_size;
 }
 
-int MyMbedUDP::available() {
+int NiclaMbedUDP::available() {
   return _current_packet_size;
 }
 
 // Read a single byte from the current packet
-int MyMbedUDP::read() {
+int NiclaMbedUDP::read() {
   // no current packet...
   if (_current_packet == NULL) {
     // try reading the next frame, if there is no data return
@@ -158,7 +158,7 @@ int MyMbedUDP::read() {
 
 // Read up to len bytes from the current packet and place them into buffer
 // Returns the number of bytes read, or 0 if none are available
-int MyMbedUDP::read(unsigned char *buffer, size_t len) {
+int NiclaMbedUDP::read(unsigned char *buffer, size_t len) {
   // Q: does Arduino read() function handle fragmentation? I won't for now...
   if (_current_packet == NULL) {
     if (parsePacket() == 0) return 0;
@@ -195,20 +195,20 @@ int MyMbedUDP::read(unsigned char *buffer, size_t len) {
   return len;
 }
 
-IPAddress MyMbedUDP::remoteIP() {
+IPAddress NiclaMbedUDP::remoteIP() {
   nsapi_addr_t address = _remoteHost.get_addr();
   return IPAddress(address.bytes[0], address.bytes[1], address.bytes[2], address.bytes[3]);
 }
 
-uint16_t MyMbedUDP::remotePort() {
+uint16_t NiclaMbedUDP::remotePort() {
   return _remoteHost.get_port();
 }
 
-void MyMbedUDP::flush() {
+void NiclaMbedUDP::flush() {
   // TODO: a real check to ensure transmission has been completed
 }
 
-int MyMbedUDP::peek() {
+int NiclaMbedUDP::peek() {
   if (_current_packet_size < 1) {
     return -1;
   }

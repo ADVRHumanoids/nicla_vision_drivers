@@ -1,5 +1,5 @@
-#ifndef MYMBEDUDP_H
-#define MYMBEDUDP_H
+#ifndef NICLA_MBED_UDP_H
+#define NICLA_MBED_UDP_H
 
 #ifndef WIFI_UDP_BUFFER_SIZE
 #define WIFI_UDP_BUFFER_SIZE 8192
@@ -10,7 +10,7 @@
 #endif
 
 #include "Arduino.h"
-#include "MySocketHelpers.h"
+#include "NiclaSocketHelpers.h"
 #include "api/Udp.h"
 
 #include "netsocket/SocketAddress.h"
@@ -20,7 +20,7 @@
 
  
 //namespace arduino {
-class MyMbedUDP : public UDP {
+class NiclaMbedUDP : public UDP {
 private:
   UDPSocket _socket;          // Mbed OS socket
   SocketAddress _host;        // Host to be used to send data
@@ -39,8 +39,8 @@ protected:
   virtual NetworkInterface* getNetwork() = 0;
 
 public:
-  MyMbedUDP();  // Constructor
-  ~MyMbedUDP();
+  NiclaMbedUDP();  // Constructor
+  ~NiclaMbedUDP();
   virtual uint8_t begin(uint16_t);                      // initialize, start listening on specified port. Returns 1 if successful, 0 if there are no sockets available to use
   virtual uint8_t beginMulticast(IPAddress, uint16_t);  // initialize, start listening on specified multicast IP address and port. Returns 1 if successful, 0 if there are no sockets available to use
   virtual void stop();                                  // Finish with the UDP socket
@@ -87,9 +87,9 @@ public:
   // // Return the port of the host who sent the current incoming packet
   virtual uint16_t remotePort();
 
-  friend class MyMbedSocketClass;
+  friend class NiclaMbedSocketClass;
 };
 
 //}
 
-#endif
+#endif //NICLA_MBED_UDP_H
