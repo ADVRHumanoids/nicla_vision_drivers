@@ -46,7 +46,8 @@ Step-by-step instructions on how to get the drivers running onboard the Arduino 
   - **Camera** JPEGENC by *Larry Bank*
   - **TOF** VL53L1X by *Pololu*
   - **Microphone** *nothing*
-3. Download the *arduino/main* folder of this repo.
+  - **CRC32** by *Christopher Baker* - crc-32 for image (only Serial)
+3. Download the *arduino/main* folder of this repo for UDP/TCP connection, or the *arduino/mainSerial* for Serial (UART over USB) connection.
 4. Modify accordingly the ```config.h``` file for network and sensors configuration.
 5. Open the ```main.ino``` file in Arduino IDE and upload it on the Nicla.
 
@@ -129,8 +130,7 @@ Distributed under the Apache-2.0 License. See LICENSE for more information.
   year={2024},
   volume={},
   number={},
-  pages={},
-  doi={}
+  pages={149-156},
+  doi={10.1109/Humanoids58906.2024.10769951}
 }
-```
 ```

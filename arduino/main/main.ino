@@ -117,7 +117,6 @@ class StreamManager {
 
     // # Defining package dimensions (bytes) utils
     const unsigned int int2bytesSize = 4; 
-    const unsigned int packetSize = 65000;
     const unsigned int headerLength = int2bytesSize + int2bytesSize + sizeof(IMAGE_TYPE);  // bytes (pkg size + timestamp size + data type size) = 4 + 4 + 1 =  9
     const unsigned int imuSize = headerLength - int2bytesSize + 6 * int2bytesSize;        // 6 Floats and each Float is 4 bytes (as the Int);
     const unsigned int distanceSize = headerLength - int2bytesSize + int2bytesSize;        // = 9 - 4 + 4 = 9   Note: this info is used in server -> we do -4 because pkg size is len(packet)-len(pkg size)) 
@@ -784,7 +783,7 @@ void StreamManager::sense_and_send() {
       Serial.print("IMG TIME GET (us)"); Serial.println(end_time-start_time);
     }
 
-    int offset_out_jpg = 0; 
+    //int offset_out_jpg = 0; 
 
     for (int i = 0; i < 2; i++){  // Process the image at halves: 320 x 240 x 2  === (first half) 320 x 120 x 2 and (second half) 320 x 120 x 2
       
@@ -823,9 +822,9 @@ void StreamManager::sense_and_send() {
       jpgenc.encodeBegin(&enc, 320, 120, JPEGE_PIXEL_RGB888, JPEGE_SUBSAMPLE_444, JPEGE_Q_MED); 
       jpgenc.addFrame(&enc, data_buffer, 320 * 3); 
       out_jpg_len = jpgenc.close();
-      if (!i){
-        offset_out_jpg = out_jpg_len; 
-      }
+      // if (!i){
+      //   offset_out_jpg = out_jpg_len; 
+      // }
 
       if (VERBOSE_TIME) {
         end_time = micros();
