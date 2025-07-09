@@ -28,7 +28,7 @@
   #include <Arduino_LSM6DSOX.h>
 #endif
 
-#define IMAGE_MODE CAMERA_RGB565
+
 
 class StreamManager {
   public:
@@ -79,25 +79,26 @@ class StreamManager {
 
     unsigned long timestamp = 0;
     //generic data buffer for multiple sensors. Size is the max data (images). 
-    #if USE_CAM    
-      uint8_t data_buffer[320*240*3];
+    #if USE_CAM && CAM_COMPRESS  
+        uint8_t data_buffer[320*240*3]; 
     #elif USE_MIC
-      uint8_t data_buffer[1+9+512*2+10+1]; //start_byte + headerLength + 512*short + end_byte + un qualcosa nonsisamai
+      uint8_t data_buffer[1+9+512*2+10+1]; //start_byte + headerLength + 512*short + un qualcosa nonsisamai + end_byte
     #elif USE_IMU
-      uint8_t data_buffer[1+9+6*4+10+1]; //start_byte +headerLength + 6*float + end_byte + un qualcosa nonsisamai
+      uint8_t data_buffer[1+9+6*4+10+1]; //start_byte +headerLength + 6*float + un qualcosa nonsisamai + end_byte
     #else
-      uint8_t data_buffer[1+9+4+10+1]; //start_byte + headerLength + int + end_byte + un qualcosa nonsisamai
+      //tof just an int, cam without compression use the framebuffer and data_buffer just for the header
+      //even if only cam and no compress would require smaller buffer, lets use this size anyway
+      uint8_t data_buffer[1+9+4+10+1]; //start_byte + headerLength + int + un qualcosa nonsisamai + end_byte
     #endif
 
     // Camera  
     #if USE_CAM      
       GC2145 nicla_cam; 
       std::shared_ptr<Camera> camPtr;       
-      int sample_rate = 60; 
-      FrameBuffer fb; 
+      FrameBuffer fb;
       int img_ptr_len;
       // uint8_t fake_img[153600];
-      #if COMPRESS_IMAGE
+      #if CAM_COMPRESS
         JPEGENC jpgenc;
         JPEGENCODE enc; 
       #endif
@@ -258,7 +259,7 @@ void StreamManager::initSensors() {
     camPtr = std::make_shared<Camera>(nicla_cam);
     
     // Init the cam QVGA, 30FPS 
-    if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, sample_rate)) {
+    if (!camPtr->begin(CAM_RES, CAM_PIXFORMAT, CAM_FPS)) {
       if(SERIAL_ENABLE_FOR_VERBOSE) Serial.println("\nCamera not available!\n");
       this->switchOnLED("red");
     }
@@ -468,7 +469,7 @@ void StreamManager::sense_and_send() {
 
   #if USE_CAM    
 
-  #if COMPRESS_IMAGE 
+  #if CAM_COMPRESS 
 
   if (camPtr->grabFrame(fb, 500) == 0) {  
 
@@ -569,7 +570,7 @@ void StreamManager::sense_and_send() {
 
   } 
 
-  #else //not COMPRESS_IMAGE
+  #else //not CAM_COMPRESS
   if (camPtr->grabFrame(fb, 500) == 0) {  
 
     if (VERBOSE_TIME) start_time = micros();
@@ -630,7 +631,7 @@ void StreamManager::sense_and_send() {
 
   }  
 
-  #endif //COMPRESS_IMAGE 
+  #endif //CAM_COMPRESS 
   #endif //USE_CAM
 
   /***************************************/

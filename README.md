@@ -48,7 +48,7 @@ Step-by-step instructions on how to get the drivers running onboard the Arduino 
   - **Microphone** *nothing*
   - **CRC32** by *Christopher Baker* - crc-32 for image (only Serial)
 3. Download the *arduino/main* folder of this repo for UDP/TCP connection, or the *arduino/mainSerial* for Serial (UART over USB) connection.
-4. Modify accordingly the ```config.h``` file for network and sensors configuration.
+4. Modify accordingly the `config.h`/`configSerial.h` file for network and sensors configuration.
 5. Open the ```main.ino``` file in Arduino IDE and upload it on the Nicla.
 
 ## Usage (Arduino)
