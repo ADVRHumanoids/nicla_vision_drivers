@@ -436,6 +436,7 @@ void StreamManager::initSensors() {
 
   #if USE_CAM      
     camPtr = std::make_shared<Camera>(nicla_cam);
+    //camPtr->debug(Serial);
     
     // Init the cam QVGA, 30FPS 
     if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, sample_rate)) {
