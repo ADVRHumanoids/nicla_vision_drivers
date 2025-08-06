@@ -6,8 +6,6 @@
 #include <SPI.h>
 #include <Arduino.h> 
 
-#include "SerialTransfer.h"
-
 #include <memory>
 #include <functional>
 
