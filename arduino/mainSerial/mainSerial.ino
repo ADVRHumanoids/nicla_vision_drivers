@@ -577,6 +577,36 @@ void StreamManager::sense_and_send() {
 
     uint8_t* img_ptr = fb.getBuffer();
 
+    //reverse the image buffer to rotate the image 180 deg
+
+    int i = camPtr->frameSize() - 1;
+    int j = 0;
+    #if CAM_PIXFORMAT == 1 //CAMERA_BAYER
+      while (i > j) {
+        uint8_t temp = img_ptr[i];
+        img_ptr[i] = img_ptr[j];
+        img_ptr[j] = temp;
+        i--;
+        j++;
+      }
+    #endif
+    #if CAM_PIXFORMAT == 2 //CAMERA_RGB565
+      while (i > j) {
+        uint8_t temp1 = img_ptr[i];
+        uint8_t temp2 = img_ptr[i-1];
+
+        img_ptr[i-1] = img_ptr[j];
+        img_ptr[i] = img_ptr[j+1];
+
+        img_ptr[j] = temp2;
+        img_ptr[j+1] = temp1;
+        i -= 2;
+        j += 2;
+
+      }
+
+    #endif
+
     if (VERBOSE_TIME) {
       end_time = micros();
       Serial.print("IMG TIME GET (us)"); Serial.println(end_time-start_time);
