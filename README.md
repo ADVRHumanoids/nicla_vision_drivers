@@ -1,5 +1,5 @@
 # :star: Nicla Vision Drivers :star:
-Plug-and-play MicroPython drivers for Arduino Nicla Vision sensors.
+Plug-and-play Arduino drivers for Arduino Nicla Vision sensors.
 
 ![Alt Text](assets/Nicla_Vision.png)
 
@@ -7,12 +7,11 @@ Plug-and-play MicroPython drivers for Arduino Nicla Vision sensors.
 
 ## Description
 
-This package contains the MicroPython drivers enabling the [Arduino Nicla Vision](https://docs.arduino.cc/hardware/nicla-vision/) board to be ready-to-use in the ROS world! :boom:
+This package contains the Arduino (and deprecated Micropython) drivers enabling the [Arduino Nicla Vision](https://docs.arduino.cc/hardware/nicla-vision/) board to be ready-to-use in the ROS world! :boom:
 
-The developed MicroPython script allows for streaming of sensors data from the Arduino Nicla Vision board to a ROS-running machine via TCP or UDP sockets. 
+The developed scripts allows for streaming of sensors data from the Arduino Nicla Vision board to a ROS-running machine via Serial, TCP or UDP sockets. 
 This package provide the optimised drivers that will be running on the Nicla Vision board, allowing to:
-- connect the board to a WiFi,
-- start a TCP/UDP socket stream,
+- connect the board to Serial/WiFi,
 - sense all the sensors,
 - serialize the sensors data,
 - send the sensors data through the socket.
