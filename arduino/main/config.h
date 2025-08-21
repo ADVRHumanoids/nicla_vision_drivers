@@ -18,4 +18,7 @@
 #define USE_IMU true
 #define USE_TOF true
 
+//image options
+#define CAM_FPS 60 //30, 60
+
 #endif //CONFIG_H

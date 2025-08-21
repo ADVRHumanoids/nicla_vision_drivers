@@ -148,7 +148,6 @@ class StreamManager {
     #if USE_CAM      
       GC2145 nicla_cam; 
       std::shared_ptr<Camera> camPtr;       
-      int sample_rate = 60; 
       JPEGENC jpgenc;
       JPEGENCODE enc; 
       FrameBuffer fb; 
@@ -439,7 +438,7 @@ void StreamManager::initSensors() {
     //camPtr->debug(Serial);
     
     // Init the cam QVGA, 30FPS 
-    if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, sample_rate)) {
+    if (!camPtr->begin(CAMERA_R320x240, IMAGE_MODE, CAM_FPS)) {
       if(SERIAL_ENABLE) Serial.println("\nCamera not available!\n");
       this->switchOnLED("red");
     }
