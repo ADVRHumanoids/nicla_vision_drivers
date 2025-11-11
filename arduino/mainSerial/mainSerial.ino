@@ -579,7 +579,7 @@ void StreamManager::sense_and_send() {
 
     int i = camPtr->frameSize() - 1;
     int j = 0;
-    #if CAM_PIXFORMAT == 1 //CAMERA_BAYER
+    #if CAM_PIXFORMAT == CAMERA_BAYER
       while (i > j) {
         uint8_t temp = img_ptr[i];
         img_ptr[i] = img_ptr[j];
@@ -588,7 +588,7 @@ void StreamManager::sense_and_send() {
         j++;
       }
     #endif
-    #if CAM_PIXFORMAT == 2 //CAMERA_RGB565
+    #if CAM_PIXFORMAT == CAMERA_RGB565
       while (i > j) {
         uint8_t temp1 = img_ptr[i];
         uint8_t temp2 = img_ptr[i-1];
